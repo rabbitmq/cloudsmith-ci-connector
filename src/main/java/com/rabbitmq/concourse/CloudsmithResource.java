@@ -73,8 +73,11 @@ public class CloudsmithResource {
         }
       }
 
-      // TODO output version and metadata
+      Map<String, Object> out = new LinkedHashMap<>();
+      out.put("version", input.version());
+      out.put("metadata", Collections.emptyList());
 
+      out(GSON.toJson(out));
     } else if ("out".equals(command)) {
       Input input = GSON.fromJson(builder.toString(), Input.class);
       String inputDirectory = args[1];
