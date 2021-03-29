@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,10 @@ public class CloudsmithResource {
 
   static final Duration PACKAGE_SYNCHRONIZATION_TIMEOUT = Duration.ofMinutes(5);
 
+  static final String DELETED_VERSION = "<DELETED>";
+  static final String JSON_DELETED_VERSION =
+      "{\n" + "  \"version\": { \"version\": \"<DELETED>\" },\n" + "  \"metadata\": [ ]\n" + "}";
+
   public static void main(String[] args) throws IOException, InterruptedException {
     Scanner scanner = new Scanner(System.in);
     StringBuilder builder = new StringBuilder();
@@ -51,13 +56,31 @@ public class CloudsmithResource {
     String command = args[0];
 
     if ("check".equals(command)) {
-      throw new IllegalArgumentException("command not supported: " + command);
+      check(null);
     } else if ("in".equals(command)) {
       Input input = GSON.fromJson(builder.toString(), Input.class);
+      String outputDirectory = args[1];
+      in(input, outputDirectory);
+    } else if ("out".equals(command)) {
+      Input input = GSON.fromJson(builder.toString(), Input.class);
+      String inputDirectory = args[1];
+      out(input, inputDirectory);
+    } else {
+      throw new IllegalArgumentException("command not supported: " + command);
+    }
+  }
+
+  static void check(Input in) {
+    throw new IllegalArgumentException("command not supported: check");
+  }
+
+  static void in(Input input, String outputDirectory) throws IOException, InterruptedException {
+    if (DELETED_VERSION.equals(input.version().version())) {
+      log("Getting special version <DELETED> is a no-op; returning it as is");
+      out(JSON_DELETED_VERSION);
+    } else {
       CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
       List<Package> packages = access.find();
-
-      String outputDirectory = args[1];
 
       logGreen("Downloading files...");
       for (Package p : packages) {
@@ -78,9 +101,34 @@ public class CloudsmithResource {
       out.put("metadata", Collections.emptyList());
 
       out(GSON.toJson(out));
-    } else if ("out".equals(command)) {
-      Input input = GSON.fromJson(builder.toString(), Input.class);
-      String inputDirectory = args[1];
+    }
+  }
+
+  static void out(Input input, String inputDirectory) throws IOException, InterruptedException {
+    if (input.params().delete()) {
+      CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
+      List<Package> packages = access.find();
+
+      List<String> versions =
+          packages.stream().map(Package::version).distinct().collect(Collectors.toList());
+
+      List<String> versionsToDelete = filterForDeletion(versions, input.params().keepLastN());
+      log(green("Version(s) detected: ") + String.join(", ", versions));
+      log(green("Version(s) to delete: ") + String.join(", ", versionsToDelete));
+
+      newLine();
+
+      logGreen("Packages:");
+      packages.forEach(
+          p -> {
+            logIndent(
+                versionsToDelete.contains(p.version())
+                    ? (red("deleting " + p.filename()) + yellow(" (skipped)"))
+                    : "keeping " + p.filename());
+          });
+
+      out(JSON_DELETED_VERSION);
+    } else {
       inputDirectory =
           (input.params().localPath() == null || input.params().localPath().isBlank())
               ? inputDirectory
@@ -176,14 +224,41 @@ public class CloudsmithResource {
 
         out(GSON.toJson(out));
       }
-
-    } else {
-      throw new IllegalArgumentException("command not supported: " + command);
     }
   }
 
   static String fileExtension(String filename) {
     return filename.substring(filename.lastIndexOf(".") + 1);
+  }
+
+  static List<String> filterForDeletion(List<String> versions, int keepLastN) {
+    if (versions.isEmpty()) {
+      return Collections.emptyList();
+    } else if (keepLastN <= 0) {
+      // do not want to keep any, return all
+      return versions;
+    } else if (keepLastN >= versions.size()) {
+      // we want to keep more than we have, so nothing to delete
+      return Collections.emptyList();
+    } else {
+      class VersionWrapper {
+
+        private final String version;
+        private final ComparableVersion comparableVersion;
+
+        VersionWrapper(String version) {
+          this.version = version;
+          this.comparableVersion =
+              new ComparableVersion(version.startsWith("1:") ? version.substring(2) : version);
+        }
+      }
+      return versions.stream()
+          .map(VersionWrapper::new)
+          .sorted(Comparator.comparing(o -> o.comparableVersion))
+          .limit(versions.size() - keepLastN)
+          .map(w -> w.version)
+          .collect(Collectors.toList());
+    }
   }
 
   static Set<String> selectFilesForUpload(String inputDirectory, String[] globs)
@@ -233,6 +308,10 @@ public class CloudsmithResource {
 
   static void log(String message) {
     System.err.println(message);
+  }
+
+  static void newLine() {
+    log("");
   }
 
   static void logIndent(String message) {
@@ -304,6 +383,14 @@ public class CloudsmithResource {
       Source source = input.source();
       Version version = input.version();
 
+      if (input.source().name() != null) {
+        queryParameters.add("filename:" + input.source().name());
+      }
+
+      if (input.params() != null && input.params().versionFilter() != null) {
+        queryParameters.add("version:" + input.params().versionFilter());
+      }
+
       if (version != null) {
         if (version.version() != null) {
           queryParameters.add("version:" + version.version());
@@ -318,13 +405,23 @@ public class CloudsmithResource {
         }
       }
 
+      if ((version == null || version.distribution() == null) && source.distribution() != null) {
+        String[] nameCodename = source.distribution().split("/");
+        queryParameters.add("distribution:" + nameCodename[0]);
+        queryParameters.add("distribution:" + nameCodename[1]);
+      }
+
       String url =
           SEARCH_URL_TPL
               .replace("{org}", source.organization())
               .replace("{repo}", source.repository());
 
       if (!queryParameters.isEmpty()) {
-        String query = Utils.encode(String.join(" AND ", queryParameters));
+        String query = String.join(" AND ", queryParameters);
+        newLine();
+        log(yellow("Query: ") + query);
+        newLine();
+        query = Utils.encode(query);
         url = url + "?query=" + query;
       }
 
@@ -365,7 +462,7 @@ public class CloudsmithResource {
               .build();
       HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
       String responseBody = response.body();
-      //            String response = "{\"identifier\":\"XeXAmp1eF11e\"}";
+
       String identifier =
           GSON.fromJson(responseBody, JsonObject.class).get("identifier").getAsString();
       String createUrl =
@@ -462,9 +559,13 @@ public class CloudsmithResource {
 
   static class Params {
 
+    private boolean delete;
     private String globs;
     private String tags;
     private String local_path;
+    // for deletion
+    private String version_filter;
+    private int keep_last_n;
 
     public String localPath() {
       return local_path;
@@ -476,6 +577,18 @@ public class CloudsmithResource {
 
     public String tags() {
       return tags;
+    }
+
+    public String versionFilter() {
+      return version_filter;
+    }
+
+    public boolean delete() {
+      return delete;
+    }
+
+    public int keepLastN() {
+      return keep_last_n;
     }
 
     @Override

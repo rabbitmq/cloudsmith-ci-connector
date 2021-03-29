@@ -53,7 +53,7 @@ resource_types:
   - name: cloudsmith-package
     type: docker-image
     source:
-      repository: pivotalrabbitmq/cloudsmith-package-resource
+      repository: pivotalrabbitmq/concourse-cloudsmith-resource
       tag: latest
 
 # declare a repository to check for new versions of Erlang debian packages
@@ -78,12 +78,18 @@ resources:
       organization: rabbitmq
       repository: rabbitmq-erlang
       api_key: the-api-key
+      name: '^erlang*'
       distribution: 'ubuntu/focal'
 
 # in job definition
         - put: rabbitmq-erlang
           params:
-            local_path: PACKAGES 
-            globs: 'erlang-1:23*.deb'
+            delete: true
+            version_filter: '1:23*'
+            keep_last_n: 2
+        - put: rabbitmq-erlang
+          params:
+            local_path: PACKAGES
+            globs: 'erlang*23*.deb'
             tags: 'erlang,erlang-23.x'
 ```
