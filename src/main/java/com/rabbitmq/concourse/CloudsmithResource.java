@@ -24,6 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class CloudsmithResource {
@@ -88,8 +91,12 @@ public class CloudsmithResource {
           byte[] content = access.download(p.cdnUrl());
           Files.write(Path.of(outputDirectory, p.filename()), content);
           String checksum = CloudsmithPackageAccess.sha256(content);
-          String message =
-              checksum.equals(p.sha256()) ? "OK" : "OK? (checksum verification failed)";
+          String message;
+          if (p.filename().toLowerCase().endsWith(".asc")) {
+            message = "OK? (checksum not verified for ASC files)";
+          } else {
+            message = checksum.equals(p.sha256()) ? "OK" : "OK? (checksum verification failed)";
+          }
           logIndent(green(p.filename() + ": ") + message);
         } catch (Exception e) {
           logIndent(red(p.filename() + ": " + e.getMessage()));
@@ -147,7 +154,20 @@ public class CloudsmithResource {
       logGreen("Files:");
       selectedFiles.forEach(file -> logIndent(Paths.get(file).getFileName().toString()));
 
-      log("");
+      newLine();
+
+      Map<String, Object> creationParameters = new LinkedHashMap<>();
+      Collection<String> filenames = filenames(selectedFiles);
+      if (input.params() != null && input.params().version() != null) {
+        String version = extractVersion(input.params().version(), filenames);
+        if (version != null && !version.isBlank()) {
+          creationParameters.put("version", version);
+          log(green("Extracted version: ") + version);
+          newLine();
+        }
+      }
+
+      String packagesType = determinePackagesType(filenames);
 
       CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
       List<String> uploadFilesUrls = new ArrayList<>(selectedFiles.size());
@@ -155,11 +175,10 @@ public class CloudsmithResource {
         Path path = Paths.get(selectedFile);
         log(green("Upload file: ") + path.getFileName());
         try {
-          String selfUrl = access.upload(selectedFile);
+          String selfUrl = access.upload(selectedFile, creationParameters, packagesType);
           logIndent(selfUrl);
           uploadFilesUrls.add(selfUrl);
         } catch (Exception e) {
-          e.printStackTrace();
           logIndent(red("Error: " + e.getMessage()));
         }
       }
@@ -168,7 +187,7 @@ public class CloudsmithResource {
 
       String version = null;
 
-      logGreen("Checking synchronization of packages..");
+      logGreen("Checking synchronization of packages...");
       for (String packageUrl : uploadFilesUrls) {
         Package p = null;
         try {
@@ -176,14 +195,16 @@ public class CloudsmithResource {
           long waitTime = Duration.ofSeconds(10).toMillis();
           int waitedTime = 0;
           long timeoutInMs = PACKAGE_SYNCHRONIZATION_TIMEOUT.toMillis();
+          printIndent(green(p.filename() + ": "));
           while (waitedTime <= timeoutInMs) {
             if (p.isSyncCompleted()) {
-              logIndent(green(p.filename() + ": ") + "OK");
+              log("OK");
               if (version == null) {
                 version = p.version();
               }
               break;
             }
+            print(".");
             Thread.sleep(waitTime);
             waitedTime += waitTime;
             p = access.findPackage(packageUrl);
@@ -199,24 +220,11 @@ public class CloudsmithResource {
       } else {
         Map<String, String> outVersion = new LinkedHashMap<>();
         outVersion.put("version", version);
-        outVersion.put("distribution", input.source.distribution());
-        List<String> extensions =
-            selectedFiles.stream()
-                .map(f -> Paths.get(f).getFileName().toString())
-                .map(f -> fileExtension(f.toLowerCase()))
-                .distinct()
-                .collect(Collectors.toList());
-        String type;
-        if (extensions.isEmpty() || extensions.size() > 2) {
-          type = "raw";
-        } else if ("deb".equals(extensions.get(0))) {
-          type = "deb";
-        } else if ("rpm".equals(extensions.get(0))) {
-          type = "rpm";
-        } else {
-          type = "raw";
+        if (input.source().distribution() != null) {
+          outVersion.put("distribution", input.source.distribution());
         }
-        outVersion.put("type", type);
+
+        outVersion.put("type", packagesType);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("version", outVersion);
@@ -225,6 +233,31 @@ public class CloudsmithResource {
         out(GSON.toJson(out));
       }
     }
+  }
+
+  static Collection<String> filenames(Collection<String> files) {
+    return files.stream()
+        .map(f -> Paths.get(f).getFileName().toString())
+        .collect(Collectors.toSet());
+  }
+
+  static String determinePackagesType(Collection<String> filenames) {
+    List<String> extensions =
+        filenames.stream()
+            .map(f -> fileExtension(f.toLowerCase()))
+            .distinct()
+            .collect(Collectors.toList());
+    String type;
+    if (extensions.isEmpty() || extensions.size() > 2) {
+      type = "raw";
+    } else if ("deb".equals(extensions.get(0))) {
+      type = "deb";
+    } else if ("rpm".equals(extensions.get(0))) {
+      type = "rpm";
+    } else {
+      type = "raw";
+    }
+    return type;
   }
 
   static String fileExtension(String filename) {
@@ -259,6 +292,23 @@ public class CloudsmithResource {
           .map(w -> w.version)
           .collect(Collectors.toList());
     }
+  }
+
+  static String extractVersion(String versionPattern, Collection<String> filenames) {
+    Pattern pattern = Pattern.compile(versionPattern);
+    return filenames.stream()
+        .reduce(
+            null,
+            (acc, filename) -> {
+              String version;
+              Matcher matcher = pattern.matcher(filename);
+              if (matcher.matches() && matcher.groupCount() == 1) {
+                version = matcher.group(1);
+              } else {
+                version = acc;
+              }
+              return version;
+            });
   }
 
   static Set<String> selectFilesForUpload(String inputDirectory, String[] globs)
@@ -322,20 +372,30 @@ public class CloudsmithResource {
     System.out.println(message);
   }
 
-  private static final class CloudsmithPackageAccess {
+  static void printIndent(String message) {
+    print("    " + message);
+  }
+
+  static void print(String message) {
+    System.err.print(message);
+  }
+
+  static final class CloudsmithPackageAccess {
 
     private static final String UPLOAD_URL_TPL = "https://upload.cloudsmith.io/{org}/{repo}/{file}";
     private static final String CREATE_PACKAGE_URL_TPL =
         "https://api-prd.cloudsmith.io/v1/packages/{org}/{repo}/upload/{type}/";
-    private static final String CREATE_JSON_TPL =
-        "{\"package_file\": \"{id}\", \"distribution\": \"{distribution}\", \"tags\": \"{tags}\"}";
     private static final String SEARCH_URL_TPL = "https://api.cloudsmith.io/packages/{org}/{repo}/";
     private final HttpClient client =
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(60)).build();
     private final Input input;
+    private final Source source;
+    private final Params params;
 
     private CloudsmithPackageAccess(Input input) {
       this.input = input;
+      this.source = input.source();
+      this.params = input.params();
     }
 
     static String base64(String in) {
@@ -352,17 +412,6 @@ public class CloudsmithResource {
       return sb.toString();
     }
 
-    static String type(String file) {
-      file = file.toLowerCase();
-      if (file.endsWith(".deb")) {
-        return "deb";
-      } else if (file.endsWith(".rpm")) {
-        return "rpm";
-      } else {
-        return "raw";
-      }
-    }
-
     static String nextLink(String linkHeader) {
       String nextLink = null;
       for (String link : linkHeader.split(",")) {
@@ -376,6 +425,10 @@ public class CloudsmithResource {
         }
       }
       return nextLink;
+    }
+
+    static String uploadJsonBody(Map<String, Object> parameters) {
+      return GSON.toJson(parameters);
     }
 
     List<Package> find() throws IOException, InterruptedException {
@@ -445,7 +498,9 @@ public class CloudsmithResource {
       return packages;
     }
 
-    String upload(String file) throws IOException, NoSuchAlgorithmException, InterruptedException {
+    String upload(String file, Map<String, Object> creationParameters, String type)
+        throws IOException, NoSuchAlgorithmException, InterruptedException {
+      creationParameters = new LinkedHashMap<>(creationParameters);
       Path path = Paths.get(file);
       byte[] content = Files.readAllBytes(path);
       String uploadUrl =
@@ -469,13 +524,18 @@ public class CloudsmithResource {
           CREATE_PACKAGE_URL_TPL
               .replace("{org}", input.source().organization())
               .replace("{repo}", input.source().repository())
-              .replace("{type}", type(file));
+              .replace("{type}", type);
 
-      String createJson =
-          CREATE_JSON_TPL
-              .replace("{id}", identifier)
-              .replace("{distribution}", input.source().distribution())
-              .replace("{tags}", input.params().tags());
+      creationParameters.put("package_file", identifier);
+      if (source.distribution() != null) {
+        creationParameters.put("distribution", source.distribution());
+      }
+
+      if (params != null && params.tags() != null) {
+        creationParameters.put("tags", params.tags());
+      }
+
+      String createJson = uploadJsonBody(creationParameters);
 
       request =
           requestBuilder()
@@ -563,6 +623,7 @@ public class CloudsmithResource {
     private String globs;
     private String tags;
     private String local_path;
+    private String version; // to extract version for "raw" packages
     // for deletion
     private String version_filter;
     private int keep_last_n;
@@ -589,6 +650,10 @@ public class CloudsmithResource {
 
     public int keepLastN() {
       return keep_last_n;
+    }
+
+    public String version() {
+      return version;
     }
 
     @Override
