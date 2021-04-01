@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -125,14 +126,31 @@ public class CloudsmithResource {
 
       newLine();
 
+      AtomicInteger deletedCount = new AtomicInteger();
       logGreen("Packages:");
       packages.forEach(
           p -> {
-            logIndent(
-                versionsToDelete.contains(p.version())
-                    ? (red("deleting " + p.filename()) + yellow(" (skipped)"))
-                    : "keeping " + p.filename());
+            boolean shouldBeDeleted = versionsToDelete.contains(p.version());
+            if (shouldBeDeleted) {
+              deletedCount.incrementAndGet();
+            }
+            if (shouldBeDeleted && input.params().doDelete()) {
+              try {
+                access.delete(p);
+                logIndent(red("deleting " + p.filename()));
+              } catch (Exception e) {
+                logRed("Error while trying to delete " + p.selfUrl() + ": " + e.getMessage());
+              }
+            } else {
+              logIndent(
+                  shouldBeDeleted
+                      ? (red("deleting " + p.filename()) + yellow(" (skipped)"))
+                      : "keeping " + p.filename());
+            }
           });
+
+      newLine();
+      logGreen("Deleted " + deletedCount.get() + " file(s)");
 
       out(JSON_DELETED_VERSION);
     } else {
@@ -550,6 +568,18 @@ public class CloudsmithResource {
       return selfUrl;
     }
 
+    void delete(Package p) throws IOException, InterruptedException {
+      HttpRequest request = requestBuilder().uri(URI.create(p.selfUrl())).DELETE().build();
+      HttpResponse<Void> response = client.send(request, BodyHandlers.discarding());
+      if (response.statusCode() != 204) {
+        logRed(
+            "Error while trying to delete "
+                + p.selfUrl()
+                + ". HTTP response code is "
+                + response.statusCode());
+      }
+    }
+
     byte[] download(String packageUrl) throws IOException, InterruptedException {
       HttpRequest request = requestBuilder().uri(URI.create(packageUrl)).GET().build();
       HttpResponse<byte[]> response = client.send(request, BodyHandlers.ofByteArray());
@@ -620,6 +650,7 @@ public class CloudsmithResource {
   static class Params {
 
     private boolean delete;
+    private boolean do_delete;
     private String globs;
     private String tags;
     private String local_path;
@@ -654,6 +685,10 @@ public class CloudsmithResource {
 
     public String version() {
       return version;
+    }
+
+    public boolean doDelete() {
+      return do_delete;
     }
 
     @Override
