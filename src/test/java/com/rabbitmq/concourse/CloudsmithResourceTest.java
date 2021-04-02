@@ -1,6 +1,7 @@
 package com.rabbitmq.concourse;
 
 import static com.rabbitmq.concourse.CloudsmithResource.CloudsmithPackageAccess.uploadJsonBody;
+import static com.rabbitmq.concourse.CloudsmithResource.checkForNewVersions;
 import static com.rabbitmq.concourse.CloudsmithResource.extractVersion;
 import static com.rabbitmq.concourse.CloudsmithResource.filterForDeletion;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +55,20 @@ public class CloudsmithResourceTest {
   static Set<String> selectFilesForUpload(Path inputDirectory, String... globs) throws IOException {
     return CloudsmithResource.selectFilesForUpload(
         inputDirectory.toFile().getAbsolutePath(), globs);
+  }
+
+  static Package p(String version, boolean isSyncCompleted, boolean hasSyncFailed) {
+    Package p = new Package();
+    p.setVersion(version);
+    p.setIs_sync_completed(isSyncCompleted);
+    p.setIs_sync_failed(hasSyncFailed);
+    return p;
+  }
+
+  static List<Package> packages(Package... packages) {
+    List<Package> ps = Arrays.asList(packages);
+    Collections.shuffle(ps);
+    return ps;
   }
 
   @Test
@@ -247,5 +262,53 @@ public class CloudsmithResourceTest {
     assertThat(extractVersion(versionRegex, filenames)).isEqualTo("3.9.0-alpha.473");
     assertThat(extractVersion(versionRegex, Collections.emptyList())).isNull();
     assertThat(extractVersion("foo", filenames)).isNull();
+  }
+
+  @Test
+  void checkForNewVersionsShouldReturnCurrentAndLaterVersionInChronologicalOrder() {
+    List<Package> packages =
+        packages(
+            p("1", true, false),
+            p("1", true, false),
+            p("2", true, false),
+            p("3", true, false),
+            p("4", true, false),
+            p("7", true, false));
+    String currentVersion = "2";
+    assertThat(checkForNewVersions(currentVersion, packages)).containsExactly("2", "3", "4", "7");
+    assertThat(checkForNewVersions(null, packages)).containsExactly("1", "2", "3", "4", "7");
+
+    packages =
+        packages(
+            p("1", true, false),
+            p("1", true, false),
+            p("2", true, false),
+            p("3", true, false),
+            p("4", true, true), // sync failed, should not show up
+            p("7", true, false));
+    assertThat(checkForNewVersions(currentVersion, packages)).containsExactly("2", "3", "7");
+    packages =
+        packages(
+            p("1", true, false),
+            p("1", true, false),
+            p("2", true, false),
+            p("3", true, false),
+            p("4", false, false), // sync not completed, should not show up
+            p("7", true, false));
+    assertThat(checkForNewVersions(currentVersion, packages)).containsExactly("2", "3", "7");
+
+    packages =
+        packages(
+            p("1:23.1", true, false),
+            p("1:23.1", true, false),
+            p("1:23.2", true, false),
+            p("1:23.3", true, false),
+            p("1:23.4", true, false),
+            p("1:23.7", true, false));
+    currentVersion = "1:23.2";
+    assertThat(checkForNewVersions(currentVersion, packages))
+        .containsExactly("1:23.2", "1:23.3", "1:23.4", "1:23.7");
+    assertThat(checkForNewVersions(null, packages))
+        .containsExactly("1:23.1", "1:23.2", "1:23.3", "1:23.4", "1:23.7");
   }
 }

@@ -4,6 +4,7 @@ class Package {
 
   private String self_url;
   private boolean is_sync_completed;
+  private boolean is_sync_failed;
   private String filename;
   private String cdn_url;
   private String version;
@@ -15,6 +16,10 @@ class Package {
 
   boolean isSyncCompleted() {
     return this.is_sync_completed;
+  }
+
+  boolean isSyncFailed() {
+    return this.is_sync_failed;
   }
 
   String filename() {
@@ -31,6 +36,18 @@ class Package {
 
   String sha256() {
     return this.checksum_sha256;
+  }
+
+  void setIs_sync_completed(boolean is_sync_completed) {
+    this.is_sync_completed = is_sync_completed;
+  }
+
+  void setIs_sync_failed(boolean is_sync_failed) {
+    this.is_sync_failed = is_sync_failed;
+  }
+
+  public void setVersion(String version) {
+    this.version = version;
   }
 
   @Override

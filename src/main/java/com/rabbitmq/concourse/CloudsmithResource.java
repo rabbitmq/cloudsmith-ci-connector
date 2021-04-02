@@ -27,14 +27,17 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -60,7 +63,8 @@ public class CloudsmithResource {
     String command = args[0];
 
     if ("check".equals(command)) {
-      check(null);
+      Input input = GSON.fromJson(builder.toString(), Input.class);
+      check(input);
     } else if ("in".equals(command)) {
       Input input = GSON.fromJson(builder.toString(), Input.class);
       String outputDirectory = args[1];
@@ -74,8 +78,18 @@ public class CloudsmithResource {
     }
   }
 
-  static void check(Input in) {
-    throw new IllegalArgumentException("command not supported: check");
+  static void check(Input input) throws IOException, InterruptedException {
+    String currentVersion = input.version() == null ? null : input.version().version();
+    input.version = null; // should not be a search criteria
+    CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
+    List<Package> packages = access.find();
+    List<String> versions = checkForNewVersions(currentVersion, packages);
+    String output =
+        GSON.toJson(
+            versions.stream()
+                .map(v -> Collections.singletonMap("version", v))
+                .collect(Collectors.toList()));
+    out(output);
   }
 
   static void in(Input input, String outputDirectory) throws IOException, InterruptedException {
@@ -310,6 +324,83 @@ public class CloudsmithResource {
           .map(w -> w.version)
           .collect(Collectors.toList());
     }
+  }
+
+  static List<String> checkForNewVersions(String currentVersion, List<Package> packages) {
+    class VersionWrapper {
+
+      final String original;
+      final ComparableVersion comparableVersion;
+      boolean hasNonCompletedPackage = false;
+
+      VersionWrapper(String version) {
+        this.original = version;
+        this.comparableVersion =
+            new ComparableVersion(version.startsWith("1:") ? version.substring(2) : version);
+      }
+
+      void considerPackage(Package p) {
+        if (!hasNonCompletedPackage) {
+          hasNonCompletedPackage = !(p.isSyncCompleted() && !p.isSyncFailed());
+        }
+      }
+
+      @Override
+      public boolean equals(Object o) {
+        if (this == o) {
+          return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+          return false;
+        }
+        VersionWrapper that = (VersionWrapper) o;
+        return original.equals(that.original);
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(original);
+      }
+
+      @Override
+      public String toString() {
+        return "VersionWrapper{" + "original='" + original + '\'' + '}';
+      }
+    }
+
+    VersionWrapper comparableCurrentVersion =
+        new VersionWrapper(currentVersion == null ? "0.0.0" : currentVersion);
+    Predicate<VersionWrapper> afterCurrentVersion =
+        currentVersion == null
+            ? v -> true
+            : v -> v.comparableVersion.compareTo(comparableCurrentVersion.comparableVersion) >= 0;
+
+    HashMap<String, VersionWrapper> allVersions =
+        packages.stream()
+            .reduce(
+                new HashMap<>(),
+                (versions, p) -> {
+                  VersionWrapper versionWrapper =
+                      versions.computeIfAbsent(p.version(), VersionWrapper::new);
+                  versionWrapper.considerPackage(p);
+                  return versions;
+                },
+                (stringVersionWrapperMap, stringVersionWrapperMap2) -> {
+                  stringVersionWrapperMap.putAll(stringVersionWrapperMap2);
+                  return stringVersionWrapperMap;
+                });
+
+    if (currentVersion != null) {
+      allVersions.put(currentVersion, new VersionWrapper(currentVersion));
+    }
+
+    return allVersions.values().stream()
+        .filter(v -> v.hasNonCompletedPackage == false)
+        .filter(afterCurrentVersion)
+        .sorted(Comparator.comparing(v -> v.comparableVersion))
+        .distinct()
+        .map(versionWrapper -> versionWrapper.original)
+        .collect(Collectors.toList());
   }
 
   static String extractVersion(String versionPattern, Collection<String> filenames) {
@@ -553,6 +644,10 @@ public class CloudsmithResource {
         creationParameters.put("tags", params.tags());
       }
 
+      if (params.republish()) {
+        creationParameters.put("republish", true);
+      }
+
       String createJson = uploadJsonBody(creationParameters);
 
       request =
@@ -651,6 +746,7 @@ public class CloudsmithResource {
 
     private boolean delete;
     private boolean do_delete;
+    private boolean republish;
     private String globs;
     private String tags;
     private String local_path;
@@ -689,6 +785,10 @@ public class CloudsmithResource {
 
     public boolean doDelete() {
       return do_delete;
+    }
+
+    public boolean republish() {
+      return republish;
     }
 
     @Override
