@@ -46,8 +46,12 @@ class Package {
     this.is_sync_failed = is_sync_failed;
   }
 
-  public void setVersion(String version) {
+  void setVersion(String version) {
     this.version = version;
+  }
+
+  void setFilename(String filename) {
+    this.filename = filename;
   }
 
   @Override

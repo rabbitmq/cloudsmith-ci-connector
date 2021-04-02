@@ -4,6 +4,7 @@ import static com.rabbitmq.concourse.CloudsmithResource.CloudsmithPackageAccess.
 import static com.rabbitmq.concourse.CloudsmithResource.checkForNewVersions;
 import static com.rabbitmq.concourse.CloudsmithResource.extractVersion;
 import static com.rabbitmq.concourse.CloudsmithResource.filterForDeletion;
+import static com.rabbitmq.concourse.CloudsmithResource.globPredicate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -69,6 +70,12 @@ public class CloudsmithResourceTest {
     List<Package> ps = Arrays.asList(packages);
     Collections.shuffle(ps);
     return ps;
+  }
+
+  static Package p(String name) {
+    Package p = new Package();
+    p.setFilename(name);
+    return p;
   }
 
   @Test
@@ -310,5 +317,19 @@ public class CloudsmithResourceTest {
         .containsExactly("1:23.2", "1:23.3", "1:23.4", "1:23.7");
     assertThat(checkForNewVersions(null, packages))
         .containsExactly("1:23.1", "1:23.2", "1:23.3", "1:23.4", "1:23.7");
+  }
+
+  @Test
+  void globsPredicateShouldFilterFiles() {
+    List<String> files = Arrays.asList("data.txt", "data.foo", "data.dat", "data.bar");
+    assertThat(globPredicate("*.txt,*.dat").test(p("data.txt"))).isTrue();
+    assertThat(globPredicate("*.txt,*.dat").test(p("data.foo"))).isFalse();
+    assertThat(globPredicate("*.txt,*.dat").test(p("data.dat"))).isTrue();
+    assertThat(globPredicate("*.txt,*.dat").test(p("data.bar"))).isFalse();
+
+    assertThat(globPredicate("*.txt").test(p("data.txt"))).isTrue();
+    assertThat(globPredicate("*.txt").test(p("data.foo"))).isFalse();
+    assertThat(globPredicate("*.txt").test(p("data.dat"))).isFalse();
+    assertThat(globPredicate("*.txt").test(p("data.bar"))).isFalse();
   }
 }

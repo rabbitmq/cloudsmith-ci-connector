@@ -23,6 +23,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
@@ -100,23 +101,42 @@ public class CloudsmithResource {
       CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
       List<Package> packages = access.find();
 
-      logGreen("Downloading files...");
-      for (Package p : packages) {
-        try {
-          byte[] content = access.download(p.cdnUrl());
-          Files.write(Path.of(outputDirectory, p.filename()), content);
-          String checksum = CloudsmithPackageAccess.sha256(content);
-          String message;
-          if (p.filename().toLowerCase().endsWith(".asc")) {
-            message = "OK? (checksum not verified for ASC files)";
-          } else {
-            message = checksum.equals(p.sha256()) ? "OK" : "OK? (checksum verification failed)";
-          }
-          logIndent(green(p.filename() + ": ") + message);
-        } catch (Exception e) {
-          logIndent(red(p.filename() + ": " + e.getMessage()));
-        }
+      Predicate<Package> globPredicate =
+          globPredicate(
+              input.params() == null || input.params().globs() == null
+                  ? null
+                  : input.params().globs());
+
+      if (packages.stream().anyMatch(globPredicate)) {
+        logGreen("Downloading files...");
       }
+      packages.stream()
+          .filter(globPredicate)
+          .forEach(
+              p -> {
+                try {
+                  byte[] content = access.download(p.cdnUrl());
+                  Files.write(Path.of(outputDirectory, p.filename()), content);
+                  String checksum = CloudsmithPackageAccess.sha256(content);
+                  String message;
+                  if (p.filename().toLowerCase().endsWith(".asc")) {
+                    message = "OK? (checksum not verified for ASC files)";
+                  } else {
+                    message =
+                        checksum.equals(p.sha256()) ? "OK" : "OK? (checksum verification failed)";
+                  }
+                  logIndent(green(p.filename() + ": ") + message);
+                } catch (Exception e) {
+                  logIndent(red(p.filename() + ": " + e.getMessage()));
+                }
+              });
+
+      if (packages.stream().anyMatch(Predicate.not(globPredicate))) {
+        newLine();
+        logGreen("Ignored:");
+      }
+
+      packages.stream().filter(Predicate.not(globPredicate)).forEach(p -> logIndent(p.filename()));
 
       Map<String, Object> out = new LinkedHashMap<>();
       out.put("version", input.version());
@@ -124,6 +144,20 @@ public class CloudsmithResource {
 
       out(GSON.toJson(out));
     }
+  }
+
+  static Predicate<Package> globPredicate(String globs) {
+    globs = globs == null || globs.isBlank() ? "*" : globs;
+    return Arrays.stream(globs.split(","))
+        .map(String::trim)
+        .map(g -> "glob:" + g)
+        .map(g -> FileSystems.getDefault().getPathMatcher(g))
+        .map(
+            pathMatcher ->
+                (Predicate<Package>) p -> pathMatcher.matches(Path.of(p.filename()).getFileName()))
+        .reduce(
+            aPackage -> false,
+            (packagePredicate, packagePredicate2) -> packagePredicate.or(packagePredicate2));
   }
 
   static void out(Input input, String inputDirectory) throws IOException, InterruptedException {
