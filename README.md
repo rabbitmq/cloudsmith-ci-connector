@@ -28,6 +28,8 @@ make push-docker-image
 * `type`: *Optional*. Type of the packages in the repository (`deb`, `rpm`, or `raw`).
 * `version`: *Optional*. Version of the package(s), e.g. `2.*`.
 * `distribution`: *Optional*. The distribution, e.g. `ubuntu/focal`.
+* `order_by`: *Optional. One of [version, time]*. For deletion (`out`). Whether to sort packages
+by version (the default) or by time.
 
 ## Behaviour
 

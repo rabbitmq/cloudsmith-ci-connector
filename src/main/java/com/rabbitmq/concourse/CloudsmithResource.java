@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import com.rabbitmq.concourse.Utils.ZonedDateTimeDeserializer;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.URI;
@@ -22,6 +23,8 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -31,6 +34,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -38,6 +42,7 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,7 +50,10 @@ import java.util.stream.Collectors;
 
 public class CloudsmithResource {
 
-  static final Gson GSON = new GsonBuilder().create();
+  static final Gson GSON =
+      new GsonBuilder()
+          .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeDeserializer())
+          .create();
 
   static final Duration PACKAGE_SYNCHRONIZATION_TIMEOUT = Duration.ofMinutes(5);
 
@@ -165,12 +173,55 @@ public class CloudsmithResource {
       CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
       List<Package> packages = access.find();
 
-      List<String> versions =
-          packages.stream().map(Package::version).distinct().collect(Collectors.toList());
+      Map<String, PackageVersion> versions =
+          packages.stream()
+              .reduce(
+                  new HashMap<>(),
+                  (packageVersions, aPackage) -> {
+                    PackageVersion packageVersion =
+                        packageVersions.computeIfAbsent(
+                            aPackage.version(),
+                            version -> {
+                              PackageVersion pv = new PackageVersion(version);
+                              pv.consider(aPackage);
+                              return pv;
+                            });
+                    packageVersion.consider(aPackage);
+                    return packageVersions;
+                  },
+                  (stringPackageVersionHashMap, stringPackageVersionHashMap2) -> {
+                    stringPackageVersionHashMap.putAll(stringPackageVersionHashMap2);
+                    return stringPackageVersionHashMap;
+                  });
 
-      List<String> versionsToDelete = filterForDeletion(versions, input.params().keepLastN());
-      log(green("Version(s) detected: ") + String.join(", ", versions));
-      log(green("Version(s) to delete: ") + String.join(", ", versionsToDelete));
+      List<String> versionsToDelete =
+          filterForDeletion(
+              versions.values(), input.params().keepLastN(), input.source().orderByVersion());
+
+      DateTimeFormatter dateTimeFormatter =
+          DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mmO", Locale.ENGLISH);
+      Function<String, String> formatVersion =
+          new Function<String, String>() {
+            @Override
+            public String apply(String version) {
+              PackageVersion packageVersion = versions.get(version);
+              return String.format(
+                  "%s [%s]",
+                  packageVersion.version, dateTimeFormatter.format(packageVersion.lastPackageDate));
+            }
+          };
+
+      log(
+          green("Version(s) detected: ")
+              + String.join(
+                  ", ",
+                  versions.values().stream()
+                      .map(pv -> formatVersion.apply(pv.version))
+                      .collect(Collectors.toList())));
+      log(
+          green("Version(s) to delete: ")
+              + String.join(
+                  ", ", versionsToDelete.stream().map(formatVersion).collect(Collectors.toList())));
 
       newLine();
 
@@ -330,32 +381,40 @@ public class CloudsmithResource {
     return filename.substring(filename.lastIndexOf(".") + 1);
   }
 
-  static List<String> filterForDeletion(List<String> versions, int keepLastN) {
+  static List<String> filterForDeletion(
+      Collection<PackageVersion> versions, int keepLastN, boolean orderByVersion) {
     if (versions.isEmpty()) {
       return Collections.emptyList();
     } else if (keepLastN <= 0) {
       // do not want to keep any, return all
-      return versions;
+      return versions.stream().map(v -> v.version).collect(Collectors.toList());
     } else if (keepLastN >= versions.size()) {
       // we want to keep more than we have, so nothing to delete
       return Collections.emptyList();
     } else {
       class VersionWrapper {
 
-        private final String version;
+        private final PackageVersion version;
         private final ComparableVersion comparableVersion;
 
-        VersionWrapper(String version) {
+        VersionWrapper(PackageVersion version) {
           this.version = version;
           this.comparableVersion =
-              new ComparableVersion(version.startsWith("1:") ? version.substring(2) : version);
+              new ComparableVersion(
+                  version.version.startsWith("1:")
+                      ? version.version.substring(2)
+                      : version.version);
         }
       }
+      Comparator<VersionWrapper> comparator =
+          orderByVersion
+              ? Comparator.comparing(packageVersion -> packageVersion.comparableVersion)
+              : Comparator.comparing(packageVersion -> packageVersion.version.lastPackageDate);
       return versions.stream()
           .map(VersionWrapper::new)
-          .sorted(Comparator.comparing(o -> o.comparableVersion))
+          .sorted(comparator)
           .limit(versions.size() - keepLastN)
-          .map(w -> w.version)
+          .map(w -> w.version.version)
           .collect(Collectors.toList());
     }
   }
@@ -523,6 +582,26 @@ public class CloudsmithResource {
     System.err.print(message);
   }
 
+  // for out
+  static class PackageVersion {
+
+    final String version;
+    ZonedDateTime lastPackageDate;
+
+    PackageVersion(String version) {
+      this.version = version;
+    }
+
+    void consider(Package p) {
+      if (lastPackageDate == null) {
+        lastPackageDate = p.uploadedAt();
+      } else {
+        lastPackageDate =
+            lastPackageDate.isBefore(p.uploadedAt()) ? p.uploadedAt() : lastPackageDate;
+      }
+    }
+  }
+
   static final class CloudsmithPackageAccess {
 
     private static final String UPLOAD_URL_TPL = "https://upload.cloudsmith.io/{org}/{repo}/{file}";
@@ -617,6 +696,7 @@ public class CloudsmithResource {
         newLine();
         log(yellow("Query: ") + query);
         newLine();
+        // FIXME this method is meant to encode paths, not query parameters
         query = Utils.encode(query);
         url = url + "?query=" + query;
       }
@@ -851,6 +931,7 @@ public class CloudsmithResource {
     private String type;
     private String version;
     private String distribution;
+    private String order_by;
     // TODO add tags to filter out for check?
 
     public String username() {
@@ -883,6 +964,10 @@ public class CloudsmithResource {
 
     public String distribution() {
       return distribution;
+    }
+
+    public boolean orderByVersion() {
+      return order_by == null || "version".equals(order_by);
     }
 
     @Override

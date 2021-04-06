@@ -7,11 +7,14 @@ import static com.rabbitmq.concourse.CloudsmithResource.filterForDeletion;
 import static com.rabbitmq.concourse.CloudsmithResource.globPredicate;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.rabbitmq.concourse.CloudsmithResource.PackageVersion;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -78,6 +81,13 @@ public class CloudsmithResourceTest {
     return p;
   }
 
+  static PackageVersion pv(String version, String date) {
+    PackageVersion pv = new PackageVersion(version);
+    pv.lastPackageDate =
+        ZonedDateTime.parse(date + "T12:58:11.418817Z", DateTimeFormatter.ISO_ZONED_DATE_TIME);
+    return pv;
+  }
+
   @Test
   void selectedFilesForUploadShouldSelectFilesThatMatchGlob(@TempDir Path inputDirectory)
       throws IOException {
@@ -112,30 +122,34 @@ public class CloudsmithResourceTest {
 
   @Test
   void filterForDeletionShouldReturnVersionsToDelete() {
-    List<String> versions =
+    List<PackageVersion> versions =
         Arrays.asList(
-            "1:22.0-1",
-            "1:22.3-1",
-            "1:22.3.4-1",
-            "1:22.3.4.1-1",
-            "1:22.3.4.1-2",
-            "1:22.3.4.10-1",
-            "1:22.3.4.11-1",
-            "1:22.3.4.12-1",
-            "1:22.3.4.13-1",
-            "1:22.3.4.14-1",
-            "1:22.3.4.15-1",
-            "1:22.3.4.16-1", // latest
-            "1:22.3.4.2-1",
-            "1:22.3.4.3-1",
-            "1:22.3.4.4-1",
-            "1:22.3.4.5-1",
-            "1:22.3.4.6-1",
-            "1:22.3.4.7-1",
-            "1:22.3.4.8-1",
-            "1:22.3.4.9-1");
+                "1:22.0-1",
+                "1:22.3-1",
+                "1:22.3.4-1",
+                "1:22.3.4.1-1",
+                "1:22.3.4.1-2",
+                "1:22.3.4.10-1",
+                "1:22.3.4.11-1",
+                "1:22.3.4.12-1",
+                "1:22.3.4.13-1",
+                "1:22.3.4.14-1",
+                "1:22.3.4.15-1",
+                "1:22.3.4.16-1", // latest
+                "1:22.3.4.2-1",
+                "1:22.3.4.3-1",
+                "1:22.3.4.4-1",
+                "1:22.3.4.5-1",
+                "1:22.3.4.6-1",
+                "1:22.3.4.7-1",
+                "1:22.3.4.8-1",
+                "1:22.3.4.9-1")
+            .stream()
+            .map(PackageVersion::new)
+            .collect(Collectors.toList());
+
     Collections.shuffle(versions);
-    assertThat(filterForDeletion(versions, 2))
+    assertThat(filterForDeletion(versions, 2, true))
         .hasSize(versions.size() - 2)
         .containsExactlyInAnyOrder(
             "1:22.0-1",
@@ -158,32 +172,37 @@ public class CloudsmithResourceTest {
             "1:22.3.4.9-1")
         .doesNotContain("1:22.3.4.15-1", "1:22.3.4.16-1");
 
-    assertThat(filterForDeletion(versions, versions.size() - 1))
+    assertThat(filterForDeletion(versions, versions.size() - 1, true))
         .hasSize(1)
         .containsExactly("1:22.0-1");
 
-    assertThat(filterForDeletion(versions, 0)).hasSameSizeAs(versions).hasSameElementsAs(versions);
+    assertThat(filterForDeletion(versions, 0, true))
+        .hasSameSizeAs(versions)
+        .hasSameElementsAs(versions.stream().map(v -> v.version).collect(Collectors.toList()));
 
-    assertThat(filterForDeletion(versions, versions.size() + 1)).isEmpty();
+    assertThat(filterForDeletion(versions, versions.size() + 1, true)).isEmpty();
 
     versions =
         Arrays.asList(
-            "22.2.4-1.el8",
-            "22.3-1.el8",
-            "22.3.4-1.el8",
-            "22.3.4.1-1.el8",
-            "22.3.4.10-1.el8",
-            "22.3.4.11-1.el8",
-            "22.3.4.12-1.el8",
-            "22.3.4.16-1.el8", // latest
-            "22.3.4.2-1.el8",
-            "22.3.4.3-1.el8",
-            "22.3.4.4-1.el8",
-            "22.3.4.5-1.el8",
-            "22.3.4.6-1.el8",
-            "22.3.4.7-1.el8");
+                "22.2.4-1.el8",
+                "22.3-1.el8",
+                "22.3.4-1.el8",
+                "22.3.4.1-1.el8",
+                "22.3.4.10-1.el8",
+                "22.3.4.11-1.el8",
+                "22.3.4.12-1.el8",
+                "22.3.4.16-1.el8", // latest
+                "22.3.4.2-1.el8",
+                "22.3.4.3-1.el8",
+                "22.3.4.4-1.el8",
+                "22.3.4.5-1.el8",
+                "22.3.4.6-1.el8",
+                "22.3.4.7-1.el8")
+            .stream()
+            .map(PackageVersion::new)
+            .collect(Collectors.toList());
     Collections.shuffle(versions);
-    assertThat(filterForDeletion(versions, 2))
+    assertThat(filterForDeletion(versions, 2, true))
         .hasSize(versions.size() - 2)
         .containsExactlyInAnyOrder(
             "22.2.4-1.el8",
@@ -200,13 +219,52 @@ public class CloudsmithResourceTest {
             "22.3.4.7-1.el8")
         .doesNotContain("22.3.4.12-1.el8", "22.3.4.16-1.el8");
 
-    assertThat(filterForDeletion(versions, versions.size() - 1))
+    assertThat(filterForDeletion(versions, versions.size() - 1, true))
         .hasSize(1)
         .containsExactly("22.2.4-1.el8");
 
-    assertThat(filterForDeletion(versions, 0)).hasSameSizeAs(versions).hasSameElementsAs(versions);
+    assertThat(filterForDeletion(versions, 0, true))
+        .hasSameSizeAs(versions)
+        .hasSameElementsAs(versions.stream().map(v -> v.version).collect(Collectors.toList()));
 
-    assertThat(filterForDeletion(versions, versions.size() + 1)).isEmpty();
+    assertThat(filterForDeletion(versions, versions.size() + 1, true)).isEmpty();
+  }
+
+  @Test
+  void filterForDeletionShouldReturnVersionsToDeleteWhenUsingUploadingDate() {
+    List<PackageVersion> versions =
+        Arrays.asList(
+            pv("1.1", "2021-04-01"),
+            pv("1.2", "2021-04-02"),
+            pv("1.3", "2021-04-03"),
+            pv("1.4", "2021-04-04"));
+
+    Collections.shuffle(versions);
+
+    assertThat(filterForDeletion(versions, 2, false))
+        .hasSize(versions.size() - 2)
+        .containsExactly("1.1", "1.2");
+
+    assertThat(filterForDeletion(versions, 1, false))
+        .hasSize(versions.size() - 1)
+        .containsExactly("1.1", "1.2", "1.3");
+
+    versions =
+        Arrays.asList(
+            pv("1.1", "2021-04-01"),
+            pv("1.3", "2021-04-02"),
+            pv("1.2", "2021-04-03"), // uploaded after 1.3
+            pv("1.4", "2021-04-04"));
+
+    Collections.shuffle(versions);
+
+    assertThat(filterForDeletion(versions, 2, false))
+        .hasSize(versions.size() - 2)
+        .containsExactly("1.1", "1.3");
+
+    assertThat(filterForDeletion(versions, 2, true))
+        .hasSize(versions.size() - 2)
+        .containsExactly("1.1", "1.2");
   }
 
   @Test

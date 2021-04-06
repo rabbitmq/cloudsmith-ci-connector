@@ -1,5 +1,7 @@
 package com.rabbitmq.concourse;
 
+import java.time.ZonedDateTime;
+
 class Package {
 
   private String self_url;
@@ -9,6 +11,7 @@ class Package {
   private String cdn_url;
   private String version;
   private String checksum_sha256;
+  private ZonedDateTime uploaded_at;
 
   String selfUrl() {
     return this.self_url;
@@ -38,6 +41,10 @@ class Package {
     return this.checksum_sha256;
   }
 
+  public ZonedDateTime uploadedAt() {
+    return uploaded_at;
+  }
+
   void setIs_sync_completed(boolean is_sync_completed) {
     this.is_sync_completed = is_sync_completed;
   }
@@ -52,6 +59,10 @@ class Package {
 
   void setFilename(String filename) {
     this.filename = filename;
+  }
+
+  public void setUploaded_at(ZonedDateTime uploaded_at) {
+    this.uploaded_at = uploaded_at;
   }
 
   @Override
