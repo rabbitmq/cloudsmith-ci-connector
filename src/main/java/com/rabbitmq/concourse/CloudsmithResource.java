@@ -851,6 +851,7 @@ public class CloudsmithResource {
     private String type;
     private String version;
     private String distribution;
+    // TODO add tags to filter out for check?
 
     public String username() {
       return username;
