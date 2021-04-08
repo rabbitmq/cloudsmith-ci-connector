@@ -126,13 +126,8 @@ public class CloudsmithResource {
                   byte[] content = access.download(p.cdnUrl());
                   Files.write(Path.of(outputDirectory, p.filename()), content);
                   String checksum = CloudsmithPackageAccess.sha256(content);
-                  String message;
-                  if (p.filename().toLowerCase().endsWith(".asc")) {
-                    message = "OK? (checksum not verified for ASC files)";
-                  } else {
-                    message =
-                        checksum.equals(p.sha256()) ? "OK" : "OK? (checksum verification failed)";
-                  }
+                  String message =
+                      checksum.equals(p.sha256()) ? "OK" : "OK? (checksum verification failed)";
                   logIndent(green(p.filename() + ": ") + message);
                 } catch (Exception e) {
                   logIndent(red(p.filename() + ": " + e.getMessage()));
