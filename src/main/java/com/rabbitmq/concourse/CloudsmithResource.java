@@ -1,5 +1,8 @@
 package com.rabbitmq.concourse;
 
+import static com.rabbitmq.concourse.Utils.encodeHttpParameter;
+import static com.rabbitmq.concourse.Utils.encodePath;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -599,20 +602,31 @@ public class CloudsmithResource {
 
   static final class CloudsmithPackageAccess {
 
-    private static final String UPLOAD_URL_TPL = "https://upload.cloudsmith.io/{org}/{repo}/{file}";
-    private static final String CREATE_PACKAGE_URL_TPL =
-        "https://api-prd.cloudsmith.io/v1/packages/{org}/{repo}/upload/{type}/";
-    private static final String SEARCH_URL_TPL = "https://api.cloudsmith.io/packages/{org}/{repo}/";
     private final HttpClient client =
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(60)).build();
     private final Input input;
     private final Source source;
     private final Params params;
 
-    private CloudsmithPackageAccess(Input input) {
+    private final String baseUploadUrlTpl;
+    private final String baseCreatePackageUrlTpl;
+    private final String baseSearchUrlTpl;
+
+    CloudsmithPackageAccess(Input input, String baseUpload, String baseCreate, String baseSearch) {
       this.input = input;
       this.source = input.source();
       this.params = input.params();
+      this.baseUploadUrlTpl = baseUpload + "/{org}/{repo}/{file}";
+      this.baseCreatePackageUrlTpl = baseCreate + "/v1/packages/{org}/{repo}/upload/{type}/";
+      this.baseSearchUrlTpl = baseSearch + "/packages/{org}/{repo}/";
+    }
+
+    private CloudsmithPackageAccess(Input input) {
+      this(
+          input,
+          "https://upload.cloudsmith.io",
+          "https://api-prd.cloudsmith.io",
+          "https://api.cloudsmith.io");
     }
 
     static String base64(String in) {
@@ -682,17 +696,16 @@ public class CloudsmithResource {
       }
 
       String url =
-          SEARCH_URL_TPL
-              .replace("{org}", source.organization())
-              .replace("{repo}", source.repository());
+          this.baseSearchUrlTpl
+              .replace("{org}", encodePath(source.organization()))
+              .replace("{repo}", encodePath(source.repository()));
 
       if (!queryParameters.isEmpty()) {
         String query = String.join(" AND ", queryParameters);
         newLine();
         log(yellow("Query: ") + query);
         newLine();
-        // FIXME this method is meant to encode paths, not query parameters
-        query = Utils.encode(query);
+        query = encodeHttpParameter(query);
         url = url + "?query=" + query;
       }
 
@@ -722,10 +735,10 @@ public class CloudsmithResource {
       Path path = Paths.get(file);
       byte[] content = Files.readAllBytes(path);
       String uploadUrl =
-          UPLOAD_URL_TPL
-              .replace("{org}", input.source().organization())
-              .replace("{repo}", input.source().repository())
-              .replace("{file}", path.getFileName().toString());
+          this.baseUploadUrlTpl
+              .replace("{org}", encodePath(input.source().organization()))
+              .replace("{repo}", encodePath(input.source().repository()))
+              .replace("{file}", encodePath(path.getFileName().toString()));
 
       HttpRequest request =
           requestBuilder()
@@ -739,10 +752,10 @@ public class CloudsmithResource {
       String identifier =
           GSON.fromJson(responseBody, JsonObject.class).get("identifier").getAsString();
       String createUrl =
-          CREATE_PACKAGE_URL_TPL
-              .replace("{org}", input.source().organization())
-              .replace("{repo}", input.source().repository())
-              .replace("{type}", type);
+          this.baseCreatePackageUrlTpl
+              .replace("{org}", encodePath(input.source().organization()))
+              .replace("{repo}", encodePath(input.source().repository()))
+              .replace("{type}", encodePath(type));
 
       creationParameters.put("package_file", identifier);
       if (source.distribution() != null) {

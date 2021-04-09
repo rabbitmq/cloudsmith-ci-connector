@@ -131,6 +131,7 @@ public class JsonTest {
         .isEqualTo("9caade9720a63aa4ad127acbe6cd75c369ee46dfb1ea2d8192fc1225aeb7ba2c");
     assertThat(p.uploadedAt())
         .isEqualTo(
-            ZonedDateTime.parse("2021-03-19T12:58:06.413956Z", DateTimeFormatter.ISO_ZONED_DATE_TIME));
+            ZonedDateTime.parse(
+                "2021-03-19T12:58:06.413956Z", DateTimeFormatter.ISO_ZONED_DATE_TIME));
   }
 }

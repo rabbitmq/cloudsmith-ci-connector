@@ -4,7 +4,9 @@ import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +50,15 @@ final class Utils {
     return buf.toString();
   }
 
-  static String encode(String content) {
+  static String encodeHttpParameter(String value) {
+    try {
+      return URLEncoder.encode(value, CHARSET_UTF8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new IllegalStateException("Unknown charset for encoding", e);
+    }
+  }
+
+  static String encodePath(String content) {
     return encodePath(content, CHARSET_UTF8);
   }
 
