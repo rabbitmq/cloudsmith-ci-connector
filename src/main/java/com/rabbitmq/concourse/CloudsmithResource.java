@@ -311,18 +311,23 @@ public class CloudsmithResource {
           int waitedTime = 0;
           long timeoutInMs = PACKAGE_SYNCHRONIZATION_TIMEOUT.toMillis();
           printIndent(green(p.filename() + ": "));
+          boolean timedOut = true;
           while (waitedTime <= timeoutInMs) {
             if (p.isSyncCompleted()) {
               log("OK");
               if (version == null) {
                 version = p.version();
               }
+              timedOut = false;
               break;
             }
             print(".");
             Thread.sleep(waitTime);
             waitedTime += waitTime;
             p = access.findPackage(packageUrl);
+          }
+          if (timedOut) {
+            print(red(" timed out after " + PACKAGE_SYNCHRONIZATION_TIMEOUT.toSeconds() + " seconds"));
           }
         } catch (Exception e) {
           logIndent(red(p == null ? "Error" : p.filename() + ": ") + e.getMessage());
