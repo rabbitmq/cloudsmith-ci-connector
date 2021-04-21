@@ -15,7 +15,7 @@ public class JsonTest {
           + "    \"stage_str\": \"Fully Synchronised\",\n"
           + "    \"stage_updated_at\": \"2021-03-19T12:58:11.418817Z\",\n"
           + "    \"status\": 4,\n"
-          + "    \"status_reason\": null,\n"
+          + "    \"status_reason\": \"the status reason\",\n"
           + "    \"status_str\": \"Completed\",\n"
           + "    \"status_updated_at\": \"2021-03-19T12:58:11.418799Z\",\n"
           + "    \"is_sync_awaiting\": false,\n"
@@ -133,5 +133,6 @@ public class JsonTest {
         .isEqualTo(
             ZonedDateTime.parse(
                 "2021-03-19T12:58:06.413956Z", DateTimeFormatter.ISO_ZONED_DATE_TIME));
+    assertThat(p.statusReason()).isEqualTo("the status reason");
   }
 }

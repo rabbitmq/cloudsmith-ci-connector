@@ -11,6 +11,7 @@ class Package {
   private String cdn_url;
   private String version;
   private String checksum_sha256;
+  private String status_reason;
   private ZonedDateTime uploaded_at;
 
   String selfUrl() {
@@ -39,6 +40,10 @@ class Package {
 
   String sha256() {
     return this.checksum_sha256;
+  }
+
+  String statusReason() {
+    return this.status_reason;
   }
 
   public ZonedDateTime uploadedAt() {

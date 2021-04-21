@@ -199,14 +199,11 @@ public class CloudsmithResource {
       DateTimeFormatter dateTimeFormatter =
           DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mmO", Locale.ENGLISH);
       Function<String, String> formatVersion =
-          new Function<String, String>() {
-            @Override
-            public String apply(String version) {
-              PackageVersion packageVersion = versions.get(version);
-              return String.format(
-                  "%s [%s]",
-                  packageVersion.version, dateTimeFormatter.format(packageVersion.lastPackageDate));
-            }
+          version -> {
+            PackageVersion packageVersion = versions.get(version);
+            return String.format(
+                "%s [%s]",
+                packageVersion.version, dateTimeFormatter.format(packageVersion.lastPackageDate));
           };
 
       log(
@@ -273,11 +270,12 @@ public class CloudsmithResource {
 
       Map<String, Object> creationParameters = new LinkedHashMap<>();
       Collection<String> filenames = filenames(selectedFiles);
+      String extractedVersion = null;
       if (input.params() != null && input.params().version() != null) {
-        String version = extractVersion(input.params().version(), filenames);
-        if (version != null && !version.isBlank()) {
-          creationParameters.put("version", version);
-          log(green("Extracted version: ") + version);
+        extractedVersion = extractVersion(input.params().version(), filenames);
+        if (extractedVersion != null && !extractedVersion.isBlank()) {
+          creationParameters.put("version", extractedVersion);
+          log(green("Extracted version: ") + extractedVersion);
           newLine();
         }
       }
@@ -291,9 +289,14 @@ public class CloudsmithResource {
         log(green("Upload file: ") + path.getFileName());
         try {
           String selfUrl = access.upload(selectedFile, creationParameters, packagesType);
-          logIndent(selfUrl);
-          uploadFilesUrls.add(selfUrl);
+          if (selfUrl == null) {
+            logIndent("Upload failed, duplicated raw package?");
+          } else {
+            logIndent(selfUrl);
+            uploadFilesUrls.add(selfUrl);
+          }
         } catch (Exception e) {
+          e.printStackTrace();
           logIndent(red("Error: " + e.getMessage()));
         }
       }
@@ -302,36 +305,64 @@ public class CloudsmithResource {
 
       String version = null;
 
-      logGreen("Checking synchronization of packages...");
-      for (String packageUrl : uploadFilesUrls) {
-        Package p = null;
-        try {
-          p = access.findPackage(packageUrl);
-          long waitTime = Duration.ofSeconds(10).toMillis();
-          int waitedTime = 0;
-          long timeoutInMs = PACKAGE_SYNCHRONIZATION_TIMEOUT.toMillis();
-          printIndent(green(p.filename() + ": "));
-          boolean timedOut = true;
-          while (waitedTime <= timeoutInMs) {
-            if (p.isSyncCompleted()) {
-              log("OK");
-              if (version == null) {
-                version = p.version();
-              }
-              timedOut = false;
-              break;
-            }
-            print(".");
-            Thread.sleep(waitTime);
-            waitedTime += waitTime;
+      if (!uploadFilesUrls.isEmpty()) {
+        logGreen("Checking synchronization of packages...");
+        for (String packageUrl : uploadFilesUrls) {
+          Package p = null;
+          try {
             p = access.findPackage(packageUrl);
+            long waitTime = Duration.ofSeconds(10).toMillis();
+            int waitedTime = 0;
+            long timeoutInMs = PACKAGE_SYNCHRONIZATION_TIMEOUT.toMillis();
+            printIndent(green(p.filename() + ": "));
+            boolean timedOut = true;
+            while (waitedTime <= timeoutInMs) {
+              if (p.isSyncCompleted()) {
+                log("OK");
+                if (version == null) {
+                  version = p.version();
+                }
+                timedOut = false;
+                break;
+              }
+              if (p.isSyncFailed()) {
+                logRed("Error " + italic("(" + p.statusReason() + ")"));
+                if (version == null) {
+                  version = p.version();
+                }
+                timedOut = false;
+                printIndent(indent("Deleting... "));
+                try {
+                  access.delete(p);
+                  logGreen("OK");
+                } catch (Exception e) {
+                  logRed("Error: " + e.getMessage());
+                }
+                break;
+              }
+              print(".");
+              Thread.sleep(waitTime);
+              waitedTime += waitTime;
+              p = access.findPackage(packageUrl);
+            }
+            if (timedOut) {
+              print(
+                  red(
+                      " timed out after "
+                          + PACKAGE_SYNCHRONIZATION_TIMEOUT.toSeconds()
+                          + " seconds"));
+            }
+          } catch (Exception e) {
+            logIndent(red(p == null ? "Error" : p.filename() + ": ") + e.getMessage());
           }
-          if (timedOut) {
-            print(red(" timed out after " + PACKAGE_SYNCHRONIZATION_TIMEOUT.toSeconds() + " seconds"));
-          }
-        } catch (Exception e) {
-          logIndent(red(p == null ? "Error" : p.filename() + ": ") + e.getMessage());
         }
+      }
+
+      if (version == null && uploadFilesUrls.isEmpty() && extractedVersion != null) {
+        // it may be a whole set a re-submitted raw packages. If re-publish is disabled,
+        // the uploads fails immediately, so there is no way to get the version from the
+        // packages. We just set the version we extracted as the output version.
+        version = extractedVersion;
       }
 
       if (version == null) {
@@ -557,6 +588,10 @@ public class CloudsmithResource {
     return colored("[31m", message);
   }
 
+  static String italic(String message) {
+    return "\033[3m" + message + "\033[0m";
+  }
+
   static String colored(String color, String message) {
     return "\u001B" + color + message + "\u001B[0m";
   }
@@ -570,7 +605,11 @@ public class CloudsmithResource {
   }
 
   static void logIndent(String message) {
-    log("    " + message);
+    log(indent(message));
+  }
+
+  static String indent(String message) {
+    return "    " + message;
   }
 
   static void out(String message) {
@@ -578,7 +617,7 @@ public class CloudsmithResource {
   }
 
   static void printIndent(String message) {
-    print("    " + message);
+    print(indent(message));
   }
 
   static void print(String message) {
@@ -784,9 +823,19 @@ public class CloudsmithResource {
               .POST(BodyPublishers.ofString(createJson))
               .build();
 
-      responseBody = client.send(request, BodyHandlers.ofString()).body();
+      response = client.send(request, BodyHandlers.ofString());
+      responseBody = response.body();
 
-      String selfUrl = GSON.fromJson(responseBody, JsonObject.class).get("self_url").getAsString();
+      String selfUrl;
+      if (response.statusCode() == 400
+          && "raw".equals(type)
+          && !responseBody.contains("\"self_url\"")
+          && !params.republish()) {
+        // duplicated package, it's detected immediately (no sync process)
+        selfUrl = null;
+      } else {
+        selfUrl = GSON.fromJson(responseBody, JsonObject.class).get("self_url").getAsString();
+      }
       return selfUrl;
     }
 

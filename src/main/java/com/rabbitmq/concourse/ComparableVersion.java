@@ -667,7 +667,7 @@ class ComparableVersion implements Comparable<ComparableVersion> {
         int compare = prev.compareTo(c);
         System.out.println(
             "   "
-                + prev.toString()
+                + prev
                 + ' '
                 + ((compare == 0) ? "==" : ((compare < 0) ? "<" : ">"))
                 + ' '
