@@ -1,5 +1,6 @@
 package com.rabbitmq.concourse;
 
+import static com.rabbitmq.concourse.RetryUtils.retry;
 import static com.rabbitmq.concourse.Utils.encodeHttpParameter;
 import static com.rabbitmq.concourse.Utils.encodePath;
 
@@ -90,7 +91,7 @@ public class CloudsmithResource {
     }
   }
 
-  static void check(Input input) throws IOException, InterruptedException {
+  static void check(Input input) throws InterruptedException {
     String currentVersion = input.version() == null ? null : input.version().version();
     input.version = null; // should not be a search criteria
     CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
@@ -110,7 +111,7 @@ public class CloudsmithResource {
       out(JSON_DELETED_VERSION);
     } else {
       CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
-      List<Package> packages = access.find();
+      List<Package> packages = retry(() -> access.find());
 
       Predicate<Package> globPredicate =
           globPredicate(
@@ -169,7 +170,7 @@ public class CloudsmithResource {
   static void out(Input input, String inputDirectory) throws IOException, InterruptedException {
     if (input.params().delete()) {
       CloudsmithPackageAccess access = new CloudsmithPackageAccess(input);
-      List<Package> packages = access.find();
+      List<Package> packages = retry(() -> access.find());
 
       Map<String, PackageVersion> versions =
           packages.stream()
@@ -288,7 +289,8 @@ public class CloudsmithResource {
         Path path = Paths.get(selectedFile);
         log(green("Upload file: ") + path.getFileName());
         try {
-          String selfUrl = access.upload(selectedFile, creationParameters, packagesType);
+          String selfUrl =
+              retry(() -> access.upload(selectedFile, creationParameters, packagesType));
           if (selfUrl == null) {
             logIndent("Upload failed, duplicated raw package?");
           } else {
@@ -706,7 +708,7 @@ public class CloudsmithResource {
       return GSON.toJson(parameters);
     }
 
-    List<Package> find() throws IOException, InterruptedException {
+    List<Package> find() throws InterruptedException {
       List queryParameters = new ArrayList();
       Source source = input.source();
       Version version = input.version();
@@ -760,7 +762,8 @@ public class CloudsmithResource {
       List<Package> packages = new ArrayList<>();
       boolean hasMore = true;
       while (hasMore) {
-        HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
+        HttpRequest rq = request;
+        HttpResponse<String> response = retry(() -> client.send(rq, BodyHandlers.ofString()));
         packages.addAll(GSON.fromJson(response.body(), type));
         Optional<String> link = response.headers().firstValue("link");
         String nextLink;
@@ -834,7 +837,14 @@ public class CloudsmithResource {
         // duplicated package, it's detected immediately (no sync process)
         selfUrl = null;
       } else {
-        selfUrl = GSON.fromJson(responseBody, JsonObject.class).get("self_url").getAsString();
+        try {
+          selfUrl = GSON.fromJson(responseBody, JsonObject.class).get("self_url").getAsString();
+        } catch (RuntimeException e) {
+          logIndent(
+              red("Error: response status " + response.statusCode() + ", body " + responseBody));
+          logIndent(red("Creation parameters: " + createJson));
+          throw e;
+        }
       }
       return selfUrl;
     }
