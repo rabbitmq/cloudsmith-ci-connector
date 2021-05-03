@@ -312,7 +312,7 @@ public class CloudsmithResource {
         for (String packageUrl : uploadFilesUrls) {
           Package p = null;
           try {
-            p = access.findPackage(packageUrl);
+            p = retry(() -> access.findPackage(packageUrl));
             long waitTime = Duration.ofSeconds(10).toMillis();
             int waitedTime = 0;
             long timeoutInMs = PACKAGE_SYNCHRONIZATION_TIMEOUT.toMillis();
@@ -345,7 +345,7 @@ public class CloudsmithResource {
               print(".");
               Thread.sleep(waitTime);
               waitedTime += waitTime;
-              p = access.findPackage(packageUrl);
+              p = retry(() -> access.findPackage(packageUrl));
             }
             if (timedOut) {
               print(
