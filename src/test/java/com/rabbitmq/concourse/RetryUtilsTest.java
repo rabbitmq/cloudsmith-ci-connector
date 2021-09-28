@@ -22,6 +22,7 @@ public class RetryUtilsTest {
   }
 
   @BeforeEach
+  @SuppressWarnings("unchecked")
   void init() {
     task = mock(Callable.class);
   }
