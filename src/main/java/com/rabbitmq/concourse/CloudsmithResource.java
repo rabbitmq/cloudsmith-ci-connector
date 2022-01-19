@@ -728,8 +728,11 @@ public class CloudsmithResource {
         if (version.distribution() != null) {
           String[] nameCodename = version.distribution().split("/");
           if (nameCodename.length != 2) {
-            logRed("Distribution invalid: " + source.distribution() + ". "
-                + "Format should be {distribution}/{codename}, e.g. ubuntu/focal.");
+            logRed(
+                "Distribution invalid: "
+                    + source.distribution()
+                    + ". "
+                    + "Format should be {distribution}/{codename}, e.g. ubuntu/focal.");
           }
           queryParameters.add("distribution:" + nameCodename[0]);
           queryParameters.add("distribution:" + nameCodename[1]);
@@ -742,8 +745,11 @@ public class CloudsmithResource {
       if ((version == null || version.distribution() == null) && source.distribution() != null) {
         String[] nameCodename = source.distribution().split("/");
         if (nameCodename.length != 2) {
-          logRed("Distribution invalid: " + source.distribution() + ". "
-              + "Format should be {distribution}/{codename}, e.g. ubuntu/focal.");
+          logRed(
+              "Distribution invalid: "
+                  + source.distribution()
+                  + ". "
+                  + "Format should be {distribution}/{codename}, e.g. ubuntu/focal.");
         }
         queryParameters.add("distribution:" + nameCodename[0]);
         queryParameters.add("distribution:" + nameCodename[1]);
