@@ -1,4 +1,4 @@
-FROM ghcr.io/graalvm/native-image:java17-21.3.0-b1 as builder
+FROM ghcr.io/graalvm/native-image:ol8-java17-22.0.0.2 as builder
 
 COPY target/concourse-cloudsmith-resource.jar .
 
