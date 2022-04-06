@@ -1,6 +1,6 @@
 # Overview
 
-This is a Concourse resource to check, get, push, and, delete packages from [Cloudsmith](https://cloudsmith.io/).
+This is a [Concourse resource](https://concourse-ci.org/resources.html) to check, get, push, and, delete packages from [Cloudsmith](https://cloudsmith.io/).
 
 # Building
 
