@@ -36,7 +36,7 @@ public class HttpTest {
         new WireMockServer(
             wireMockConfig()
                 .dynamicPort()
-                .containerThreads(Runtime.getRuntime().availableProcessors() * 3));
+                .containerThreads(8));
     wireMockServer.start();
     WireMock.configureFor(wireMockServer.port());
   }
