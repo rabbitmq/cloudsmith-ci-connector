@@ -1,5 +1,7 @@
 # Overview
 
+[![Build (Linux)](https://github.com/rabbitmq/concourse-cloudsmith-resource/actions/workflows/test-linux.yml/badge.svg)](https://github.com/rabbitmq/concourse-cloudsmith-resource/actions/workflows/test-linux.yml)
+
 This is a [Concourse resource](https://concourse-ci.org/resources.html) to check, get, push, and, delete packages from [Cloudsmith](https://cloudsmith.io/).
 
 # Building
