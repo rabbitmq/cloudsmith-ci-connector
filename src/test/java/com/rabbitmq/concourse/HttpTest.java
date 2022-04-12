@@ -32,7 +32,11 @@ public class HttpTest {
 
   @BeforeEach
   public void startMockServer() {
-    wireMockServer = new WireMockServer(wireMockConfig().dynamicPort());
+    wireMockServer =
+        new WireMockServer(
+            wireMockConfig()
+                .dynamicPort()
+                .containerThreads(Runtime.getRuntime().availableProcessors()));
     wireMockServer.start();
     WireMock.configureFor(wireMockServer.port());
   }
