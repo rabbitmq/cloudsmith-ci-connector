@@ -30,7 +30,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <spotless.check.skip>true</spotless.check.skip>
     <gson.version>2.9.0</gson.version>
-    <graal-sdk.version>22.0.0.2</graal-sdk.version>
+    <graal-sdk.version>22.1.0</graal-sdk.version>
     <junit.jupiter.version>5.8.2</junit.jupiter.version>
     <assertj.version>3.22.0</assertj.version>
     <mockito.version>4.5.1</mockito.version>
