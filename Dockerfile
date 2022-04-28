@@ -1,4 +1,4 @@
-FROM ghcr.io/graalvm/native-image:ol8-java17-22.0.0.2 as builder
+FROM ghcr.io/graalvm/native-image:ol8-java17-22.1.0 as builder
 
 COPY target/concourse-cloudsmith-resource.jar .
 
@@ -14,5 +14,5 @@ RUN set -eux; \
 	apt-get install --yes --no-install-recommends \
 		ca-certificates
 
-COPY --from=builder concourse-cloudsmith-resource /opt/resource/
+COPY --from=builder /app/concourse-cloudsmith-resource /opt/resource/
 COPY scripts/* /opt/resource/
