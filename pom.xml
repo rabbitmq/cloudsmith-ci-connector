@@ -33,9 +33,9 @@
     <graal-sdk.version>22.2.0</graal-sdk.version>
     <junit.jupiter.version>5.9.0</junit.jupiter.version>
     <assertj.version>3.23.1</assertj.version>
-    <mockito.version>4.6.1</mockito.version>
+    <mockito.version>4.7.0</mockito.version>
     <wiremock.version>2.33.2</wiremock.version>
-    <logback.version>1.2.11</logback.version>
+    <logback.version>1.4.0</logback.version>
     <spotless.version>2.25.0</spotless.version>
     <maven.compiler.plugin.version>3.10.1</maven.compiler.plugin.version>
     <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
