@@ -6,7 +6,7 @@ RUN native-image -jar concourse-cloudsmith-resource.jar \
 		-H:Features="com.rabbitmq.concourse.NativeImageFeature" \
 		--no-fallback --enable-url-protocols=https
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 RUN set -eux; \
 	\
