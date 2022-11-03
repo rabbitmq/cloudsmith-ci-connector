@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 
-/opt/resource/concourse-cloudsmith-resource check
+java -jar /opt/resource/concourse-cloudsmith-resource.jar check
