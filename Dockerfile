@@ -6,7 +6,6 @@ RUN set -eux; \
 	apt-get install --yes --no-install-recommends \
 		ca-certificates \
 		wget \
-		gnupg \
 		jq
 
 ARG JAVA_VERSION="17"
