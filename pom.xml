@@ -33,7 +33,7 @@
     <spring-boot-maven-plugin.version>3.0.2</spring-boot-maven-plugin.version>
     <junit.jupiter.version>5.9.2</junit.jupiter.version>
     <assertj.version>3.24.2</assertj.version>
-    <mockito.version>5.0.0</mockito.version>
+    <mockito.version>5.1.0</mockito.version>
     <wiremock.version>2.35.0</wiremock.version>
     <logback.version>1.4.5</logback.version>
     <spotless.version>2.31.0</spotless.version>
