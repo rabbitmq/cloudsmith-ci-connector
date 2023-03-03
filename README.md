@@ -64,6 +64,7 @@ Upload or delete packages.
   (temporary flag to avoid deleting packages by mistake).
 * `version_filter`: *Optional*. Filter to select the packages to delete.
 * `keep_last_n`: *Optional*. Number of versions to keep when deleting. Default is 0.
+* `keep_last_minor_patches`: *Optional*. Do not delete last patch versions of identified minors. Default is false.
 
 
 # Examples
@@ -205,7 +206,7 @@ resources:
 
 # License and Copyright
 
-(c) 2021-2022 VMware, Inc. or its affiliates.
+(c) 2021-2023 VMware, Inc. or its affiliates.
 
 This package, the Concourse Cloudsmith Resource, is licensed
 under the Mozilla Public License 2.0 ("MPL").

@@ -8,6 +8,8 @@ package com.rabbitmq.concourse;
 import static com.rabbitmq.concourse.RetryUtils.retry;
 import static com.rabbitmq.concourse.Utils.encodeHttpParameter;
 import static com.rabbitmq.concourse.Utils.encodePath;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toList;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -41,6 +43,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -135,14 +138,12 @@ public class CloudsmithResource {
     List<String> versions = checkForNewVersions(currentVersion, packages);
     String output =
         GSON.toJson(
-            versions.stream()
-                .map(v -> Collections.singletonMap("version", v))
-                .collect(Collectors.toList()));
+            versions.stream().map(v -> Collections.singletonMap("version", v)).collect(toList()));
     out(output);
   }
 
   static void in(Input input, String outputDirectory) throws IOException, InterruptedException {
-    if (DELETED_VERSION.equals(input.version().version())) {
+    if (input.version() != null && DELETED_VERSION.equals(input.version().version())) {
       log("Getting special version <DELETED> is a no-op; returning it as is");
       out(JSON_DELETED_VERSION);
     } else {
@@ -233,6 +234,16 @@ public class CloudsmithResource {
           filterForDeletion(
               versions.values(), input.params().keepLastN(), input.source().orderByVersion());
 
+      Collection<String> deletionExceptions = Collections.emptySet();
+      if (input.params.keepLastMinorPatches()) {
+        String latestMinor =
+            latestMinor(versions.values().stream().map(v -> v.version).collect(toList()));
+        deletionExceptions = lastMinorPatches(latestMinor, versionsToDelete);
+        if (!input.source().orderByVersion()) {
+          logYellow("Warning: keep_last_minor_patches should only be used with order_by:version");
+        }
+      }
+
       DateTimeFormatter dateTimeFormatter =
           DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mmO", Locale.ENGLISH);
       Function<String, String> formatVersion =
@@ -249,11 +260,36 @@ public class CloudsmithResource {
                   ", ",
                   versions.values().stream()
                       .map(pv -> formatVersion.apply(pv.version))
-                      .collect(Collectors.toList())));
+                      .collect(toList())));
       log(
           green("Version(s) to delete: ")
-              + String.join(
-                  ", ", versionsToDelete.stream().map(formatVersion).collect(Collectors.toList())));
+              + String.join(", ", versionsToDelete.stream().map(formatVersion).collect(toList())));
+
+      if (input.params().keepLastMinorPatches() && !deletionExceptions.isEmpty()) {
+        log(
+            green("Deletion exception(s) (last minor patches): ")
+                + String.join(
+                    ", ", deletionExceptions.stream().map(formatVersion).collect(toList())));
+      }
+
+      Collection<String> exceptionsToDeletion = new HashSet<>(deletionExceptions);
+
+      newLine();
+
+      List<String> versionsToKeep =
+          versions.values().stream()
+              .filter(
+                  pv ->
+                      !versionsToDelete.contains(pv.version)
+                          || exceptionsToDeletion.contains(pv.version))
+              .map(pv -> formatVersion.apply(pv.version))
+              .collect(toList());
+
+      if (!versionsToKeep.isEmpty()) {
+        log(
+            green("Version(s) to keep: ")
+                + String.join(", ", versionsToKeep.stream().collect(toList())));
+      }
 
       newLine();
 
@@ -261,7 +297,9 @@ public class CloudsmithResource {
       logGreen("Packages:");
       packages.forEach(
           p -> {
-            boolean shouldBeDeleted = versionsToDelete.contains(p.version());
+            boolean shouldBeDeleted =
+                versionsToDelete.contains(p.version())
+                    && !exceptionsToDeletion.contains(p.version());
             if (shouldBeDeleted) {
               deletedCount.incrementAndGet();
             }
@@ -273,10 +311,13 @@ public class CloudsmithResource {
                 logRed("Error while trying to delete " + p.selfUrl() + ": " + e.getMessage());
               }
             } else {
+              boolean isDeletionException = exceptionsToDeletion.contains(p.version());
               logIndent(
                   shouldBeDeleted
                       ? (red("deleting " + p.filename()) + yellow(" (skipped)"))
-                      : "keeping " + p.filename());
+                      : "keeping "
+                          + p.filename()
+                          + (isDeletionException ? " (latest minor patch)" : ""));
             }
           });
 
@@ -432,10 +473,7 @@ public class CloudsmithResource {
 
   static String determinePackagesType(Collection<String> filenames) {
     List<String> extensions =
-        filenames.stream()
-            .map(f -> fileExtension(f.toLowerCase()))
-            .distinct()
-            .collect(Collectors.toList());
+        filenames.stream().map(f -> fileExtension(f.toLowerCase())).distinct().collect(toList());
     String type;
     if (extensions.isEmpty() || extensions.size() > 2) {
       type = "raw";
@@ -459,7 +497,7 @@ public class CloudsmithResource {
       return Collections.emptyList();
     } else if (keepLastN <= 0) {
       // do not want to keep any, return all
-      return versions.stream().map(v -> v.version).collect(Collectors.toList());
+      return versions.stream().map(v -> v.version).collect(toList());
     } else if (keepLastN >= versions.size()) {
       // we want to keep more than we have, so nothing to delete
       return Collections.emptyList();
@@ -487,7 +525,76 @@ public class CloudsmithResource {
           .sorted(comparator)
           .limit(versions.size() - keepLastN)
           .map(w -> w.version.version)
-          .collect(Collectors.toList());
+          .collect(toList());
+    }
+  }
+
+  static List<String> lastMinorPatches(String minorToIgnore, List<String> versions) {
+    if (versions == null || versions.isEmpty()) {
+      return Collections.emptyList();
+    }
+    class VersionWrapper {
+
+      private final String version;
+      private final ComparableVersion comparableVersion;
+      private final String minor;
+
+      VersionWrapper(String version) {
+        this.version = version;
+        // e.g. 1:22.3.4.3-1, removing 1:
+        String curatedVersion = version.startsWith("1:") ? version.substring(2) : version;
+        this.comparableVersion = new ComparableVersion(curatedVersion);
+        this.minor = extractMinor(version);
+      }
+    }
+
+    Map<String, List<VersionWrapper>> minors =
+        versions.stream()
+            .map(VersionWrapper::new)
+            .filter(v -> !v.minor.equals(minorToIgnore))
+            .collect(groupingBy(versionWrapper -> versionWrapper.minor));
+
+    Comparator<VersionWrapper> comparator =
+        Comparator.comparing(wrapper -> wrapper.comparableVersion);
+    return minors.values().stream()
+        .map(
+            patches -> {
+              if (patches.size() == 1) {
+                return patches.get(0).version;
+              } else {
+                return Collections.max(patches, comparator).version;
+              }
+            })
+        .collect(toList());
+  }
+
+  static String extractMinor(String version) {
+    // e.g. 1:22.3.4.3-1, removing 1:
+    String curatedVersion = version.startsWith("1:") ? version.substring(2) : version;
+    // e.g. 22.3-1, removing -1
+    curatedVersion =
+        curatedVersion.contains("-")
+            ? curatedVersion.substring(0, curatedVersion.lastIndexOf("-"))
+            : curatedVersion;
+    String[] digits = curatedVersion.split("\\.");
+    if (digits == null || digits.length <= 1) {
+      return curatedVersion;
+    } else {
+      return digits[0] + "." + digits[1];
+    }
+  }
+
+  static String latestMinor(List<String> versions) {
+    if (versions == null || versions.isEmpty()) {
+      return null;
+    } else {
+      return versions.stream()
+          .map(CloudsmithResource::extractMinor)
+          .distinct()
+          .map(ComparableVersion::new)
+          .max(Comparator.naturalOrder())
+          .get()
+          .toString();
     }
   }
 
@@ -565,7 +672,7 @@ public class CloudsmithResource {
         .sorted(Comparator.comparing(v -> v.comparableVersion))
         .distinct()
         .map(versionWrapper -> versionWrapper.original)
-        .collect(Collectors.toList());
+        .collect(toList());
   }
 
   static String extractVersion(String versionPattern, Collection<String> filenames) {
@@ -990,6 +1097,7 @@ public class CloudsmithResource {
     // for deletion
     private String version_filter;
     private int keep_last_n;
+    private boolean keep_last_minor_patches = false;
 
     public String localPath() {
       return local_path;
@@ -1013,6 +1121,10 @@ public class CloudsmithResource {
 
     public int keepLastN() {
       return keep_last_n;
+    }
+
+    public boolean keepLastMinorPatches() {
+      return this.keep_last_minor_patches;
     }
 
     public String version() {
