@@ -36,7 +36,7 @@
     <mockito.version>5.2.0</mockito.version>
     <wiremock.version>2.35.0</wiremock.version>
     <logback.version>1.4.6</logback.version>
-    <spotless.version>2.35.0</spotless.version>
+    <spotless.version>2.36.0</spotless.version>
     <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
     <maven-surefire-plugin.version>3.0.0</maven-surefire-plugin.version>
     <maven.compiler.source>17</maven.compiler.source>
