@@ -34,7 +34,7 @@
     <junit.jupiter.version>5.10.0</junit.jupiter.version>
     <assertj.version>3.24.2</assertj.version>
     <mockito.version>5.5.0</mockito.version>
-    <wiremock.version>2.35.0</wiremock.version>
+    <wiremock.version>2.35.1</wiremock.version>
     <logback.version>1.4.11</logback.version>
     <spotless.version>2.39.0</spotless.version>
     <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
