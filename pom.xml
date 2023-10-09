@@ -39,8 +39,8 @@
     <spotless.version>2.39.0</spotless.version>
     <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
     <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
   </properties>
 
   <dependencies>
@@ -112,8 +112,13 @@
       </plugin>
 
       <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${maven-surefire-plugin.version}</version>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven-surefire-plugin.version}</version>
+          <configuration>
+              <systemPropertyVariables>
+                  <net.bytebuddy.experimental>true</net.bytebuddy.experimental>
+              </systemPropertyVariables>
+          </configuration>
       </plugin>
 
       <plugin>
@@ -139,7 +144,7 @@
         <configuration>
           <java>
             <googleJavaFormat>
-              <version>1.15.0</version>
+              <version>1.18.1</version>
               <style>GOOGLE</style>
             </googleJavaFormat>
           </java>

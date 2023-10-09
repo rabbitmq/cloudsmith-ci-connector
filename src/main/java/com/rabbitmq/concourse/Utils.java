@@ -76,22 +76,26 @@ final class Utils {
    * href="https://www.ietf.org/rfc/rfc2396.txt">RFC 2396</a>
    */
   private static final BitSet UNRESERVED = new BitSet(256);
+
   /**
    * Punctuation characters: , ; : $ & + =
    *
    * <p>These are the additional characters allowed by userinfo.
    */
   private static final BitSet PUNCT = new BitSet(256);
+
   /**
    * Characters which are safe to use in userinfo, i.e. {@link #UNRESERVED} plus {@link
    * #PUNCT}uation
    */
   private static final BitSet USERINFO = new BitSet(256);
+
   /**
    * Characters which are safe to use in a path, i.e. {@link #UNRESERVED} plus {@link #PUNCT}uation
    * plus / @
    */
   private static final BitSet PATHSAFE = new BitSet(256);
+
   /**
    * Characters which are safe to use in a query or a fragment, i.e. {@link #RESERVED} plus {@link
    * #UNRESERVED}
