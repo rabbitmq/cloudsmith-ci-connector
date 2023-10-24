@@ -38,7 +38,7 @@
     <logback.version>1.4.11</logback.version>
     <spotless.version>2.40.0</spotless.version>
     <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
-    <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.2.1</maven-surefire-plugin.version>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
   </properties>
