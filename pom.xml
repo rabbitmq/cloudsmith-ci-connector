@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.rabbitmq</groupId>
-  <artifactId>concourse-cloudsmith-resource</artifactId>
+  <artifactId>cloudsmith-ci-connector</artifactId>
   <version>1.0-SNAPSHOT</version>
 
   <licenses>
@@ -35,6 +35,7 @@
     <assertj.version>3.24.2</assertj.version>
     <mockito.version>5.7.0</mockito.version>
     <wiremock.version>2.35.1</wiremock.version>
+    <slf4j.version>2.0.9</slf4j.version>
     <logback.version>1.4.11</logback.version>
     <spotless.version>2.40.0</spotless.version>
     <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
@@ -87,6 +88,13 @@
     </dependency>
 
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <version>${logback.version}</version>
@@ -122,22 +130,6 @@
       </plugin>
 
       <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <version>${spring-boot-maven-plugin.version}</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>repackage</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <mainClass>com.rabbitmq.concourse.CloudsmithResource</mainClass>
-        </configuration>
-      </plugin>
-
-      <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
         <version>${spotless.version}</version>
@@ -162,6 +154,56 @@
     </plugins>
 
   </build>
+
+  <profiles>
+
+    <profile>
+      <id>concourse</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <version>${spring-boot-maven-plugin.version}</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>repackage</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <mainClass>com.rabbitmq.ci.CloudsmithConcourseResource</mainClass>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>github</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <version>${spring-boot-maven-plugin.version}</version>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>repackage</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <mainClass>com.rabbitmq.ci.CloudsmithGitHubAction</mainClass>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+  </profiles>
 
 
 </project>

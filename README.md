@@ -28,10 +28,8 @@ make push-docker-image
 * `api_key`: *Required.* API key used for all requests. 
 * `name`: *Optional.* Name of the package(s). Regular expressions, e.g. `^erlang$`, accepted. Used to select packages for deletion.
 * `type`: *Optional*. Type of the packages in the repository (`deb`, `rpm`, or `raw`).
-* `version`: *Optional*. Version of the package(s), e.g. `2.*`.
 * `distribution`: *Optional*. The distribution, e.g. `ubuntu/focal`.
-* `order_by`: *Optional. One of [version, time]*. For deletion (`out`). Whether to sort packages
-by version (the default) or by time.
+* `order_by`: *Optional. One of [version, time]*. For deletion (`out`). Whether to sort packages by version (the default) or by time.
 
 ## Behaviour
 

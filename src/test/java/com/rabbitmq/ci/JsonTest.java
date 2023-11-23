@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-package com.rabbitmq.concourse;
+package com.rabbitmq.ci;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -121,7 +121,7 @@ public class JsonTest {
 
   @Test
   void jsonPackageShouldDeserialized() {
-    Package p = CloudsmithResource.GSON.fromJson(JSON, Package.class);
+    Package p = Utils.GSON.fromJson(JSON, Package.class);
     assertThat(p.selfUrl())
         .isEqualTo(
             "https://api.cloudsmith.io/v1/packages/rabbitmq/concourse-resource-test/IvErs7CXiLLs/");

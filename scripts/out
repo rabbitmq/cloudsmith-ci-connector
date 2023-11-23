@@ -8,4 +8,4 @@ if [ -z "$destination" ]; then
   exit 1
 fi
 
-java -jar /opt/resource/concourse-cloudsmith-resource.jar out $destination
+java -jar /opt/resource/cloudsmith-ci-connector.jar out $destination

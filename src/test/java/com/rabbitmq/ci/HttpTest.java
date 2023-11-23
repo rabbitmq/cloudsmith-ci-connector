@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-package com.rabbitmq.concourse;
+package com.rabbitmq.ci;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.exactly;
@@ -18,8 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
-import com.rabbitmq.concourse.CloudsmithResource.CloudsmithPackageAccess;
-import com.rabbitmq.concourse.CloudsmithResource.Input;
 import java.util.List;
 import java.util.function.IntFunction;
 import org.junit.jupiter.api.AfterEach;
@@ -60,7 +58,7 @@ public class HttpTest {
             + "    \"keep_last_n\": 10\n"
             + "  }\n"
             + "}";
-    Input input = CloudsmithResource.GSON.fromJson(in, Input.class);
+    Input input = Utils.GSON.fromJson(in, Input.class);
     stubFor(get(urlPathMatching("/packages/.*")).willReturn(aResponse().withBody("[]")));
     CloudsmithPackageAccess access = access(input);
     access.find();
@@ -93,7 +91,7 @@ public class HttpTest {
     IntFunction<String> nextHeader =
         page ->
             "<" + baseUrl() + "/packages/rabbitmq/rabbitmq-erlang/page-" + page + ">; rel=\"next\"";
-    Input input = CloudsmithResource.GSON.fromJson(in, Input.class);
+    Input input = Utils.GSON.fromJson(in, Input.class);
     stubFor(
         get(urlPathMatching("/packages/rabbitmq/rabbitmq-erlang/.*"))
             .willReturn(aResponse().withBody(response).withHeader("Link", nextHeader.apply(2))));
@@ -109,7 +107,8 @@ public class HttpTest {
   }
 
   CloudsmithPackageAccess access(Input input) {
-    return new CloudsmithPackageAccess(input, baseUrl(), baseUrl(), baseUrl());
+    return new CloudsmithPackageAccess(
+        input, baseUrl(), baseUrl(), baseUrl(), new Log.GitHubActionsLog());
   }
 
   String baseUrl() {

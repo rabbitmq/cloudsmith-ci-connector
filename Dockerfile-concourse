@@ -25,7 +25,7 @@ RUN set -eux; \
     ; \
     mkdir -p /app
 
-COPY target/concourse-cloudsmith-resource.jar /app
+COPY target/cloudsmith-ci-connector.jar /app
 
 FROM ubuntu:22.04
 
@@ -48,11 +48,11 @@ RUN ln -svT $JAVA_HOME/bin/java /usr/local/bin/java
 
 COPY --from=builder /app/* /opt/resource/
 RUN set -eux; \
-    java -jar /opt/resource/concourse-cloudsmith-resource.jar test
+    java -jar /opt/resource/cloudsmith-ci-connector.jar test
 
-RUN groupadd --gid 1000 concourse
-RUN useradd --uid 1000 --gid concourse --comment "concourse user" concourse
+RUN groupadd --gid 1000 cloudsmith
+RUN useradd --uid 1000 --gid cloudsmith --comment "cloudsmith user" cloudsmith
 
-USER concourse:concourse
+USER cloudsmith:cloudsmith
 
 COPY scripts/* /opt/resource/

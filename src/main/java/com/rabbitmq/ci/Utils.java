@@ -3,23 +3,31 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-package com.rabbitmq.concourse;
+package com.rabbitmq.ci;
 
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParseException;
+import com.google.gson.*;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.BitSet;
+import java.util.function.Consumer;
 
 final class Utils {
+
+  static final Gson GSON =
+      new GsonBuilder()
+          .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeDeserializer())
+          .create();
 
   static class ZonedDateTimeDeserializer implements JsonDeserializer<ZonedDateTime> {
 
@@ -34,6 +42,35 @@ final class Utils {
   private static final Charset CHARSET_UTF8 = StandardCharsets.UTF_8;
 
   private Utils() {}
+
+  static void testSequence() {
+    Log log = new Log.GitHubActionsLog();
+    Consumer<String> display = log::logGreen;
+    String message;
+    int exitCode = 0;
+    try {
+      String testUri = "https://www.wikipedia.org/";
+      log.logYellow("Starting test sequence, trying to reach " + testUri);
+      HttpRequest request = HttpRequest.newBuilder().uri(new URI(testUri)).GET().build();
+      HttpResponse<Void> response =
+          HttpClient.newBuilder()
+              .connectTimeout(Duration.ofSeconds(60))
+              .build()
+              .send(request, HttpResponse.BodyHandlers.discarding());
+      int statusClass = response.statusCode() - response.statusCode() % 100;
+      message = "Response code is " + response.statusCode();
+      if (statusClass != 200) {
+        display = log::logRed;
+        exitCode = 1;
+      }
+    } catch (Exception e) {
+      message = "Error during test sequence: " + e.getMessage();
+      display = log::logRed;
+      exitCode = 1;
+    }
+    display.accept(message);
+    System.exit(exitCode);
+  }
 
   /* from https://github.com/apache/httpcomponents-client/commit/b58e7d46d75e1d3c42f5fd6db9bd45f32a49c639#diff-a74b24f025e68ec11e4550b42e9f807d */
 

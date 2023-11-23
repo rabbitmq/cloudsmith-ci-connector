@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-package com.rabbitmq.concourse;
+package com.rabbitmq.ci;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -11,7 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.rabbitmq.concourse.RetryUtils.RetryException;
+import com.rabbitmq.ci.RetryUtils.RetryException;
 import java.time.Duration;
 import java.util.concurrent.Callable;
 import org.assertj.core.api.Assertions;

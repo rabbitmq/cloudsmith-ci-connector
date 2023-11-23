@@ -3,21 +3,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
-package com.rabbitmq.concourse;
+package com.rabbitmq.ci;
 
-import static com.rabbitmq.concourse.CloudsmithResource.CloudsmithPackageAccess.uploadJsonBody;
-import static com.rabbitmq.concourse.CloudsmithResource.checkForNewVersions;
-import static com.rabbitmq.concourse.CloudsmithResource.extractVersion;
-import static com.rabbitmq.concourse.CloudsmithResource.filterForDeletion;
-import static com.rabbitmq.concourse.CloudsmithResource.globPredicate;
-import static com.rabbitmq.concourse.CloudsmithResource.lastMinorPatches;
-import static com.rabbitmq.concourse.CloudsmithResource.latestMinor;
+import static com.rabbitmq.ci.CloudsmithLogic.checkForNewVersions;
+import static com.rabbitmq.ci.CloudsmithLogic.extractVersion;
+import static com.rabbitmq.ci.CloudsmithLogic.filterForDeletion;
+import static com.rabbitmq.ci.CloudsmithLogic.globPredicate;
+import static com.rabbitmq.ci.CloudsmithLogic.lastMinorPatches;
+import static com.rabbitmq.ci.CloudsmithLogic.latestMinor;
+import static com.rabbitmq.ci.CloudsmithPackageAccess.uploadJsonBody;
 import static java.util.Arrays.asList;
 import static java.util.Collections.shuffle;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.rabbitmq.concourse.CloudsmithResource.PackageVersion;
+import com.rabbitmq.ci.CloudsmithLogic.PackageVersion;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -40,7 +40,7 @@ import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-public class CloudsmithResourceTest {
+public class CloudsmithConcourseResourceTest {
 
   static void newFiles(Path directory, String... names) {
     Arrays.stream(names)
@@ -67,8 +67,7 @@ public class CloudsmithResourceTest {
   }
 
   static Set<String> selectFilesForUpload(Path inputDirectory, String... globs) throws IOException {
-    return CloudsmithResource.selectFilesForUpload(
-        inputDirectory.toFile().getAbsolutePath(), globs);
+    return CloudsmithLogic.selectFilesForUpload(inputDirectory.toFile().getAbsolutePath(), globs);
   }
 
   static Package p(String version, boolean isSyncCompleted, boolean hasSyncFailed) {
@@ -155,7 +154,7 @@ public class CloudsmithResourceTest {
                 "1:22.3.4.8-1",
                 "1:22.3.4.9-1")
             .stream()
-            .map(PackageVersion::new)
+            .map(CloudsmithLogic.PackageVersion::new)
             .collect(toList());
 
     shuffle(versions);
@@ -209,7 +208,7 @@ public class CloudsmithResourceTest {
                 "22.3.4.6-1.el8",
                 "22.3.4.7-1.el8")
             .stream()
-            .map(PackageVersion::new)
+            .map(CloudsmithLogic.PackageVersion::new)
             .collect(toList());
     shuffle(versions);
     assertThat(filterForDeletion(versions, 2, true))
