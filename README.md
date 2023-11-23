@@ -204,7 +204,8 @@ resources:
 
 # License and Copyright
 
-(c) 2021-2023 VMware, Inc. or its affiliates.
+(c) 2021-2023 Broadcom. All Rights Reserved.
+The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
 
 This package, the Concourse Cloudsmith Resource, is licensed
 under the Mozilla Public License 2.0 ("MPL").
