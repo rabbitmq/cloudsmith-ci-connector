@@ -1,8 +1,10 @@
 # Overview
 
-[![Build (Linux)](https://github.com/rabbitmq/concourse-cloudsmith-resource/actions/workflows/test-linux.yml/badge.svg)](https://github.com/rabbitmq/concourse-cloudsmith-resource/actions/workflows/test-linux.yml)
+[![Build (Linux)](https://github.com/rabbitmq/cloudsmith-ci-connector/actions/workflows/test-linux.yml/badge.svg)](https://github.com/rabbitmq/cloudsmith-ci-connector/actions/workflows/test-linux.yml)
 
-This is a [Concourse resource](https://concourse-ci.org/resources.html) to check, get, push, and, delete packages from [Cloudsmith](https://cloudsmith.io/).
+This is repository provides the logic for
+* a GitHub action to download, upload, and delete packages from [Cloudsmith](https://cloudsmith.io/)
+* a [Concourse resource](https://concourse-ci.org/resources.html) to check, get, push, and, delete packages from [Cloudsmith](https://cloudsmith.io/).
 
 # Building
 
@@ -12,13 +14,104 @@ To run tests:
 make test
 ```
 
-To push the Docker image:
+To push the GitHub Actions Docker image:
 
 ```shell
-make push-docker-image
+make push-docker-image-github
 ```
 
-# Usage
+To push the Concourse Docker image:
+
+```shell
+make push-docker-image-concourse
+```
+
+# GitHub Action Usage
+
+## Configuration
+
+* `username`: *Required.* The username for the Cloudsmith account.
+* `organization`: *Required.* The organization name.
+* `repository`: *Required.* The repository name.
+* `api_key`: *Required.* API key used for all requests. 
+* `name`: *Optional.*
+For download and deletion.
+Name of the package files.
+Regular expressions, e.g. `^erlang$`, accepted.
+* `type`: *Optional*. Type of the packages in the repository (`deb`, `rpm`, or `raw`).
+* `distribution`: *Optional*. The distribution, e.g. `ubuntu/focal`.
+* `action`: *Required.* The action to perform (`download`, `upload`, or `delete`).
+* `globs`: *Optional.* Comma-separated list of globs for files that will be uploaded/downloaded.
+* `tags`: *Required.*
+For upload.
+Comma-separated list of tags that will be applied to packages.
+* `local_path`: *Optional.*
+The directory to look upload packages from / download packages to.
+Default is the current directory.
+* `republish`: *Optional*.
+For upload.
+Flag to override already existing packages.
+Default is false.
+* `version`: *Optional*.
+For upload.
+Java regular expression to extract package from file(s) when using "raw" packages.
+* `do_delete`: *Optional*.
+For deletion.
+Actually delete matching packages when using the "delete" mode (temporary flag to avoid deleting packages by mistake).
+* `version_filter`: *Optional*.
+For download and deletion.
+Filter to select the packages.
+* `keep_last_n`: *Optional*.
+For deletion.
+Number of versions to keep when deleting.
+Default is 0.
+* `keep_last_minor_patches`: *Optional*.
+For deletion.
+Do not delete last patch versions of identified minors.
+Default is false.
+* `order_by`: *Optional. One of [version, time]*.
+For deletion.
+Whether to sort packages by version (the default) or by time.
+
+
+## Examples
+
+### Publish Packages
+
+```yaml
+- name: Publish packages to Cloudsmith
+  uses: docker://pivotalrabbitmq/cloudsmith-action:latest
+  with:
+    username: ${{ secrets.CLOUDSMITH_USERNAME }}
+    organization: ${{ secrets.CLOUDSMITH_ORGANIZATION }}
+    repository: rabbitmq-erlang
+    api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
+    distribution: ubuntu/jammy
+    action: upload
+    republish: true
+    local_path: packages
+    globs: '*.deb'
+    tags: erlang,erlang-26.x
+```
+
+### Delete Packages
+
+```yaml
+- name: Delete latest versions
+  uses: docker://pivotalrabbitmq/cloudsmith-action:latest
+  with:
+    username: ${{ secrets.CLOUDSMITH_USERNAME }}
+    organization: ${{ secrets.CLOUDSMITH_ORGANIZATION }}
+    repository: rabbitmq-erlang
+    api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
+    action: delete
+    do_delete: true
+    version_filter: 1:25*
+    keep_last_n: 2
+    keep_last_minor_patches: true
+```
+
+# Concourse Resource Usage
 
 ## Source Configuration
 
@@ -65,9 +158,9 @@ Upload or delete packages.
 * `keep_last_minor_patches`: *Optional*. Do not delete last patch versions of identified minors. Default is false.
 
 
-# Examples
+## Examples
 
-## Declare the resource type
+### Declare the resource type
 
 ```yaml
 # declare the resource type
@@ -80,7 +173,7 @@ resource_types:
       tag: latest
 ```
 
-## Publish `deb` or `rpm` packages
+### Publish `deb` or `rpm` packages
 
 ```yaml
 # resource declaration
@@ -104,7 +197,7 @@ resources
     tags: 'erlang,erlang-23.x'
 ```
 
-## Publish `raw` packages
+### Publish `raw` packages
 
 ```yaml
 resources:
@@ -127,7 +220,7 @@ resources:
       tags: 'stream'
 ```
 
-## Delete `deb`/`rpm` packages
+### Delete `deb`/`rpm` packages
 
 ```yaml
 # resource declaration
@@ -153,7 +246,7 @@ resources
       keep_last_n: 2
 ```
 
-## Delete `raw` packages
+### Delete `raw` packages
 
 ```yaml
 resources:
@@ -176,7 +269,7 @@ resources:
       keep_last_n: 2
 ```
 
-## Download packages
+### Download packages
 
 ```yaml
 # resource declaration
