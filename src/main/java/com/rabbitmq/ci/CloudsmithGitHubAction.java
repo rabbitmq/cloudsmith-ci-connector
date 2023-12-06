@@ -27,7 +27,6 @@ public class CloudsmithGitHubAction {
 
   static final List<String> PARAMS_FIELDS =
       List.of(
-          "delete",
           "do_delete",
           "republish",
           "globs",
