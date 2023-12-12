@@ -55,7 +55,6 @@ public class CloudsmithGitHubActionTest {
     Input.Params params =
         CloudsmithGitHubAction.mapParams(
             k -> env.get(CloudsmithGitHubAction.FIELD_TO_ENVIRONMENT_VARIABLE.apply(k)));
-    assertThat(params.delete()).isTrue();
     assertThat(params.doDelete()).isTrue();
     assertThat(params.republish()).isTrue();
     assertThat(params.globs()).isEqualTo("*.deb");
