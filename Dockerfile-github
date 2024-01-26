@@ -20,7 +20,7 @@ RUN set -eux; \
     JAVA_PATH="/usr/lib/jdk-$JAVA_VERSION"; \
     mkdir $JAVA_PATH && \
     tar --extract  --file jdk.tar.gz --directory "$JAVA_PATH" --strip-components 1; \
-	  $JAVA_PATH/bin/jlink --compress=2 --output /jre --add-modules java.base,jdk.crypto.cryptoki,java.net.http; \
+	  $JAVA_PATH/bin/jlink --compress=zip-6 --output /jre --add-modules java.base,jdk.crypto.cryptoki,java.net.http; \
 	  /jre/bin/java -version \
     ; \
     mkdir -p /app
