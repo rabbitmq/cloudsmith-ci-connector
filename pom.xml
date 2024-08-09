@@ -35,7 +35,7 @@
     <assertj.version>3.26.3</assertj.version>
     <mockito.version>5.12.0</mockito.version>
     <wiremock.version>3.9.1</wiremock.version>
-    <slf4j.version>2.0.14</slf4j.version>
+    <slf4j.version>2.0.15</slf4j.version>
     <logback.version>1.5.6</logback.version>
     <spotless.version>2.43.0</spotless.version>
     <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
