@@ -100,11 +100,13 @@ final class CloudsmithPackageAccess {
       queryParameters.add("version:" + input.params().versionFilter());
     }
 
-    String versionCriteria;
+    String versionCriteria = null;
     if (version != null && version.version() != null) {
       versionCriteria = version.version();
     } else {
-      versionCriteria = input.params().version();
+      if (input.params() != null) {
+        versionCriteria = input.params().version();
+      }
     }
     if (versionCriteria != null) {
       queryParameters.add("version:" + versionCriteria);
