@@ -80,7 +80,7 @@ Whether to sort packages by version (the default) or by time.
 
 ```yaml
 - name: Publish packages to Cloudsmith
-  uses: docker://pivotalrabbitmq/cloudsmith-action:latest
+  uses: docker://rabbitmqdevenv/cloudsmith-action:latest
   with:
     username: ${{ secrets.CLOUDSMITH_USERNAME }}
     organization: ${{ secrets.CLOUDSMITH_ORGANIZATION }}
@@ -98,7 +98,7 @@ Whether to sort packages by version (the default) or by time.
 
 ```yaml
 - name: Delete latest versions
-  uses: docker://pivotalrabbitmq/cloudsmith-action:latest
+  uses: docker://rabbitmqdevenv/cloudsmith-action:latest
   with:
     username: ${{ secrets.CLOUDSMITH_USERNAME }}
     organization: ${{ secrets.CLOUDSMITH_ORGANIZATION }}
@@ -169,7 +169,7 @@ resource_types:
   - name: cloudsmith-package
     type: docker-image
     source:
-      repository: pivotalrabbitmq/concourse-cloudsmith-resource
+      repository: rabbitmqdevenv/concourse-cloudsmith-resource
       tag: latest
 ```
 
