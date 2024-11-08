@@ -16,14 +16,46 @@ RUN ARCH="x86"; BUNDLE="jdk"; \
 RUN wget --progress=bar:force:noscroll -O "jdk.tar.gz" $(cat jdk-info.json | jq --raw-output .url)
 RUN echo "$(cat jdk-info.json | jq --raw-output .sha256_hash) *jdk.tar.gz" | sha256sum --check --strict -
 
+ENV JAVA_HOME="/usr/lib/jdk-$JAVA_VERSION"
+
 RUN set -eux; \
-    JAVA_PATH="/usr/lib/jdk-$JAVA_VERSION"; \
-    mkdir $JAVA_PATH && \
-    tar --extract  --file jdk.tar.gz --directory "$JAVA_PATH" --strip-components 1; \
-	  $JAVA_PATH/bin/jlink --compress=zip-6 --output /jre --add-modules java.base,jdk.crypto.cryptoki,java.net.http; \
+    mkdir $JAVA_HOME && \
+    tar --extract  --file jdk.tar.gz --directory "$JAVA_HOME" --strip-components 1; \
+	  $JAVA_HOME/bin/jlink --compress=zip-6 --output /jre --add-modules java.base,jdk.crypto.cryptoki,java.net.http; \
 	  /jre/bin/java -version \
     ; \
     mkdir -p /app
+
+RUN mkdir -p /project/src /project/.mvn
+COPY src /project/src
+COPY .mvn /project/.mvn
+COPY pom.xml /project
+COPY mvnw /project
+
+WORKDIR /project
+RUN set -eux; \
+    ./mvnw package -Dmaven.test.skip --no-transfer-progress
+
+FROM ubuntu:24.04
+
+RUN set -eux; \
+	\
+	apt-get update; \
+	apt-get -y upgrade; \
+	apt-get install --yes --no-install-recommends \
+		ca-certificates \
+  ; \
+	rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk/jre
+RUN mkdir -p $JAVA_HOME
+COPY --from=builder /jre $JAVA_HOME/
+RUN ln -svT $JAVA_HOME/bin/java /usr/local/bin/java
+
+RUN mkdir -p /app
 
 COPY target/cloudsmith-ci-connector.jar /app
 
