@@ -14,11 +14,11 @@ package-concourse: clean ## Build the binary distribution
 
 .PHONY: docker-image-concourse
 docker-image-concourse: package-concourse ## Build Docker image
-	@docker build --tag pivotalrabbitmq/concourse-cloudsmith-resource:latest --file Dockerfile-concourse .
+	@docker build --tag rabbitmqdevenv/concourse-cloudsmith-resource:latest --file Dockerfile-concourse .
 
 .PHONY: push-docker-image-concourse
 push-docker-image-concourse: docker-image-concourse ## Push Docker image
-	@docker push pivotalrabbitmq/concourse-cloudsmith-resource:latest
+	@docker push rabbitmqdevenv/concourse-cloudsmith-resource:latest
 
 .PHONY: package-github
 package-github: clean ## Build the binary distribution
@@ -26,11 +26,11 @@ package-github: clean ## Build the binary distribution
 
 .PHONY: docker-image-github
 docker-image-github: package-github ## Build Docker image
-	@docker build --tag pivotalrabbitmq/cloudsmith-action:latest --file Dockerfile-github .
+	@docker build --tag rabbitmqdevenv/cloudsmith-action:latest --file Dockerfile-github .
 
 .PHONY: push-docker-image-github
 push-docker-image-github: docker-image-github ## Push Docker image
-	@docker push pivotalrabbitmq/cloudsmith-action:latest
+	@docker push rabbitmqdevenv/cloudsmith-action:latest
 
 .PHONY: clean
 clean: 	## Clean all build artefacts
