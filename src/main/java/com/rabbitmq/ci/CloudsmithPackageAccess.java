@@ -280,9 +280,6 @@ final class CloudsmithPackageAccess {
   }
 
   private HttpRequest.Builder auth(HttpRequest.Builder builder) {
-    return builder.setHeader(
-        "Authorization",
-        "Basic "
-            + CloudsmithLogic.base64(input.source().username() + ":" + input.source().apiKey()));
+    return builder.setHeader("X-Api-Key", input.source().apiKey());
   }
 }
