@@ -49,7 +49,7 @@ final class Utils {
     String message;
     int exitCode = 0;
     try {
-      String testUri = "https://www.wikipedia.org/";
+      String testUri = "https://www.example.com";
       log.logYellow("Starting test sequence, trying to reach " + testUri);
       HttpRequest request = HttpRequest.newBuilder().uri(new URI(testUri)).GET().build();
       HttpResponse<Void> response =
